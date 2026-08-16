@@ -10,6 +10,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PCCrashDiagnostic.Tests", "
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PCCrashDiagnostic.ElevatedHelper", "src\PCCrashDiagnostic.ElevatedHelper\PCCrashDiagnostic.ElevatedHelper.csproj", "{B90C5DF7-9234-4FBC-9739-72FFEB7E0C05}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PCCrashDiagnostic.Contracts", "src\PCCrashDiagnostic.Contracts\PCCrashDiagnostic.Contracts.csproj", "{BA01F8C6-7C4F-48B0-A0E8-6F5B65722632}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -32,5 +34,9 @@ Global
 		{B90C5DF7-9234-4FBC-9739-72FFEB7E0C05}.Debug|x64.Build.0 = Debug|x64
 		{B90C5DF7-9234-4FBC-9739-72FFEB7E0C05}.Release|x64.ActiveCfg = Release|x64
 		{B90C5DF7-9234-4FBC-9739-72FFEB7E0C05}.Release|x64.Build.0 = Release|x64
+		{BA01F8C6-7C4F-48B0-A0E8-6F5B65722632}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{BA01F8C6-7C4F-48B0-A0E8-6F5B65722632}.Debug|x64.Build.0 = Debug|Any CPU
+		{BA01F8C6-7C4F-48B0-A0E8-6F5B65722632}.Release|x64.ActiveCfg = Release|Any CPU
+		{BA01F8C6-7C4F-48B0-A0E8-6F5B65722632}.Release|x64.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

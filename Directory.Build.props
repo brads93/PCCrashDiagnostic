@@ -10,25 +10,30 @@
     <Authors>PC Crash Diagnostic contributors</Authors>
     <Copyright>Copyright (c) 2026 PC Crash Diagnostic contributors</Copyright>
     <RepositoryType>git</RepositoryType>
-    <PCCrashDiagnosticVersion Condition="'$(PCCrashDiagnosticVersion)' == ''">3.1.0-beta.2</PCCrashDiagnosticVersion>
-    <PCCrashDiagnosticStage Condition="'$(PCCrashDiagnosticStage)' == ''">Beta2</PCCrashDiagnosticStage>
+    <PCCrashDiagnosticVersion Condition="'$(PCCrashDiagnosticVersion)' == ''">3.2.0-beta.1</PCCrashDiagnosticVersion>
+    <PCCrashDiagnosticFeatureProfile Condition="'$(PCCrashDiagnosticFeatureProfile)' == ''">ShareReadOnly</PCCrashDiagnosticFeatureProfile>
     <PCCrashDiagnosticWerLocalDumpCapture Condition="'$(PCCrashDiagnosticWerLocalDumpCapture)' == ''">Disabled</PCCrashDiagnosticWerLocalDumpCapture>
+    <PCCrashDiagnosticRuntimeVersion Condition="'$(PCCrashDiagnosticRuntimeVersion)' == ''">10.0.11</PCCrashDiagnosticRuntimeVersion>
     <Version>$(PCCrashDiagnosticVersion)</Version>
-    <FileVersion>3.1.0.0</FileVersion>
-    <AssemblyVersion>3.1.0.0</AssemblyVersion>
-    <DefineConstants Condition="'$(PCCrashDiagnosticStage)' == 'Beta1'">$(DefineConstants);PCD_BETA1</DefineConstants>
-    <DefineConstants Condition="'$(PCCrashDiagnosticWerLocalDumpCapture)' == 'Enabled'">$(DefineConstants);PCD_WER_LOCAL_DUMPS</DefineConstants>
+    <FileVersion>3.2.0.0</FileVersion>
+    <AssemblyVersion>3.2.0.0</AssemblyVersion>
+    <DefineConstants Condition="'$(PCCrashDiagnosticFeatureProfile)' == 'ShareReadOnly'">$(DefineConstants);PCD_SHARE_READ_ONLY</DefineConstants>
+    <DefineConstants Condition="'$(PCCrashDiagnosticFeatureProfile)' == 'FullDiagnostic'">$(DefineConstants);PCD_FULL_DIAGNOSTIC</DefineConstants>
+    <DefineConstants Condition="'$(PCCrashDiagnosticFeatureProfile)' == 'WerResearch'">$(DefineConstants);PCD_FULL_DIAGNOSTIC;PCD_WER_RESEARCH</DefineConstants>
+    <DefineConstants Condition="'$(PCCrashDiagnosticFeatureProfile)' == 'WerResearch' and '$(PCCrashDiagnosticWerLocalDumpCapture)' == 'Enabled'">$(DefineConstants);PCD_WER_LOCAL_DUMPS</DefineConstants>
   </PropertyGroup>
-  <Target Name="ValidatePCCrashDiagnosticReleaseStage" BeforeTargets="BeforeBuild">
-    <Error Condition="'$(PCCrashDiagnosticStage)' != 'Beta1' and '$(PCCrashDiagnosticStage)' != 'Beta2'"
-           Text="PCCrashDiagnosticStage must be Beta1 or Beta2." />
-    <Error Condition="'$(PCCrashDiagnosticStage)' == 'Beta1' and '$(PCCrashDiagnosticVersion)' != '3.1.0-beta.1'"
-           Text="Beta1 builds must use PCCrashDiagnosticVersion=3.1.0-beta.1." />
-    <Error Condition="'$(PCCrashDiagnosticStage)' == 'Beta2' and '$(PCCrashDiagnosticVersion)' != '3.1.0-beta.2'"
-           Text="Beta2 builds must use PCCrashDiagnosticVersion=3.1.0-beta.2." />
+  <Target Name="ValidatePCCrashDiagnosticFeatureProfile" BeforeTargets="BeforeBuild">
+    <Error Condition="'$(PCCrashDiagnosticVersion)' != '3.2.0-beta.1'"
+           Text="This source tree builds only PCCrashDiagnosticVersion=3.2.0-beta.1." />
+    <Error Condition="'$(PCCrashDiagnosticFeatureProfile)' != 'ShareReadOnly' and '$(PCCrashDiagnosticFeatureProfile)' != 'FullDiagnostic' and '$(PCCrashDiagnosticFeatureProfile)' != 'WerResearch'"
+           Text="PCCrashDiagnosticFeatureProfile must be ShareReadOnly, FullDiagnostic, or WerResearch." />
     <Error Condition="'$(PCCrashDiagnosticWerLocalDumpCapture)' != 'Disabled' and '$(PCCrashDiagnosticWerLocalDumpCapture)' != 'Enabled'"
            Text="PCCrashDiagnosticWerLocalDumpCapture must be Disabled or Enabled." />
-    <Error Condition="'$(PCCrashDiagnosticStage)' == 'Beta1' and '$(PCCrashDiagnosticWerLocalDumpCapture)' == 'Enabled'"
-           Text="Per-application WER LocalDumps capture cannot be enabled in Beta1." />
+    <Error Condition="'$(PCCrashDiagnosticFeatureProfile)' != 'WerResearch' and '$(PCCrashDiagnosticWerLocalDumpCapture)' == 'Enabled'"
+           Text="Per-application WER LocalDumps capture is permitted only in the non-distributable WerResearch profile." />
+    <Error Condition="'$(PCCrashDiagnosticFeatureProfile)' == 'WerResearch' and '$(PCCrashDiagnosticWerLocalDumpCapture)' != 'Enabled'"
+           Text="WerResearch requires PCCrashDiagnosticWerLocalDumpCapture=Enabled." />
+    <Error Condition="'$(PCCrashDiagnosticRuntimeVersion)' != '10.0.11'"
+           Text="PCCrashDiagnosticRuntimeVersion must be the serviced 10.0.11 runtime for this release." />
   </Target>
 </Project>

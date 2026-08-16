@@ -1,24 +1,26 @@
 using BF6CrashDiagnostic.Core;
+using PCCrashDiagnostic.Contracts;
 
 namespace BF6CrashDiagnostic.Tests;
 
 public sealed class ReleaseStageTests
 {
     [Fact]
-    public void CompileTimeStageMatchesToolVersionAndFeatureSurface()
+    public void CompileTimeProfileMatchesToolVersionAndFeatureSurface()
     {
-#if PCD_BETA1
-        Assert.Equal("3.1.0-beta.1", ReleaseStage.Version);
-        Assert.False(ReleaseStage.Beta2FeaturesEnabled);
-#else
-        Assert.Equal("3.1.0-beta.2", ReleaseStage.Version);
+#if PCD_SHARE_READ_ONLY
+        Assert.Equal(ProductFeatureProfile.ShareReadOnly, BuildProfile.Current.Profile);
+        Assert.False(BuildProfile.Current.HasAnyPrivilegedCapability);
+#elif PCD_WER_RESEARCH
+        Assert.Equal(ProductFeatureProfile.WerResearch, BuildProfile.Current.Profile);
+        Assert.True(BuildProfile.Current.WerLocalDumps);
+#elif PCD_FULL_DIAGNOSTIC
+        Assert.Equal(ProductFeatureProfile.FullDiagnostic, BuildProfile.Current.Profile);
+        Assert.True(BuildProfile.Current.HasAnyPrivilegedCapability);
+#endif
+        Assert.Equal("3.2.0-beta.1", ReleaseStage.Version);
         Assert.True(ReleaseStage.Beta2FeaturesEnabled);
-#endif
         Assert.Equal(ReleaseStage.Version, PCCrashDiagnosticCoordinator.ToolVersion);
-#if PCD_WER_LOCAL_DUMPS
-        Assert.True(ReleaseStage.WerLocalDumpCaptureEnabled);
-#else
-        Assert.False(ReleaseStage.WerLocalDumpCaptureEnabled);
-#endif
+        Assert.Equal(BuildProfile.Current.WerLocalDumps, ReleaseStage.WerLocalDumpCaptureEnabled);
     }
 }
