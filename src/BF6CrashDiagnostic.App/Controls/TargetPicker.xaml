@@ -1,0 +1,49 @@
+<UserControl x:Class="BF6CrashDiagnostic.App.Controls.TargetPicker"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             MinWidth="420">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <TextBlock FontSize="15" FontWeight="SemiBold" Text="Application to check" />
+
+        <Border Grid.Row="1" Margin="0,9,0,0" Padding="12" CornerRadius="8"
+                Background="{StaticResource SurfaceRaisedBrush}"
+                BorderBrush="{StaticResource BorderBrush}" BorderThickness="1">
+            <StackPanel>
+                <TextBlock FontWeight="SemiBold" Text="{Binding SelectedTargetName}" TextWrapping="Wrap" />
+                <TextBlock Margin="0,3,0,0" FontSize="11" Foreground="{StaticResource MutedTextBrush}"
+                           Text="{Binding SelectedTargetDetail}" TextWrapping="Wrap" />
+            </StackPanel>
+        </Border>
+
+        <WrapPanel Grid.Row="2" Margin="0,12,0,0">
+            <Button Margin="0,0,8,8" Style="{StaticResource ButtonBaseStyle}"
+                    Command="{Binding UseBattlefieldPresetCommand}" Content="Use Battlefield 6" />
+            <Button Margin="0,0,8,8" Style="{StaticResource ButtonBaseStyle}"
+                    Command="{Binding ChooseExecutableCommand}" Content="Choose an app file…" />
+        </WrapPanel>
+
+        <Grid Grid.Row="3" Margin="0,2,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <ComboBox MinHeight="40"
+                      ItemsSource="{Binding RunningProcesses}"
+                      SelectedItem="{Binding SelectedRunningProcess}"
+                      DisplayMemberPath="DisplayText"
+                      AutomationProperties.Name="Running applications" />
+            <Button Grid.Column="1" Margin="8,0,0,0" Style="{StaticResource ButtonBaseStyle}"
+                    Command="{Binding RefreshRunningProcessesCommand}" Content="Refresh" />
+            <Button Grid.Column="2" Margin="8,0,0,0" Style="{StaticResource ButtonBaseStyle}"
+                    Command="{Binding UseRunningProcessCommand}" Content="Use this app" />
+        </Grid>
+    </Grid>
+</UserControl>

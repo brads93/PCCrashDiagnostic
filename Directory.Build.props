@@ -1,0 +1,34 @@
+<Project>
+  <PropertyGroup>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <Authors>PC Crash Diagnostic contributors</Authors>
+    <Copyright>Copyright (c) 2026 PC Crash Diagnostic contributors</Copyright>
+    <RepositoryType>git</RepositoryType>
+    <PCCrashDiagnosticVersion Condition="'$(PCCrashDiagnosticVersion)' == ''">3.1.0-beta.2</PCCrashDiagnosticVersion>
+    <PCCrashDiagnosticStage Condition="'$(PCCrashDiagnosticStage)' == ''">Beta2</PCCrashDiagnosticStage>
+    <PCCrashDiagnosticWerLocalDumpCapture Condition="'$(PCCrashDiagnosticWerLocalDumpCapture)' == ''">Disabled</PCCrashDiagnosticWerLocalDumpCapture>
+    <Version>$(PCCrashDiagnosticVersion)</Version>
+    <FileVersion>3.1.0.0</FileVersion>
+    <AssemblyVersion>3.1.0.0</AssemblyVersion>
+    <DefineConstants Condition="'$(PCCrashDiagnosticStage)' == 'Beta1'">$(DefineConstants);PCD_BETA1</DefineConstants>
+    <DefineConstants Condition="'$(PCCrashDiagnosticWerLocalDumpCapture)' == 'Enabled'">$(DefineConstants);PCD_WER_LOCAL_DUMPS</DefineConstants>
+  </PropertyGroup>
+  <Target Name="ValidatePCCrashDiagnosticReleaseStage" BeforeTargets="BeforeBuild">
+    <Error Condition="'$(PCCrashDiagnosticStage)' != 'Beta1' and '$(PCCrashDiagnosticStage)' != 'Beta2'"
+           Text="PCCrashDiagnosticStage must be Beta1 or Beta2." />
+    <Error Condition="'$(PCCrashDiagnosticStage)' == 'Beta1' and '$(PCCrashDiagnosticVersion)' != '3.1.0-beta.1'"
+           Text="Beta1 builds must use PCCrashDiagnosticVersion=3.1.0-beta.1." />
+    <Error Condition="'$(PCCrashDiagnosticStage)' == 'Beta2' and '$(PCCrashDiagnosticVersion)' != '3.1.0-beta.2'"
+           Text="Beta2 builds must use PCCrashDiagnosticVersion=3.1.0-beta.2." />
+    <Error Condition="'$(PCCrashDiagnosticWerLocalDumpCapture)' != 'Disabled' and '$(PCCrashDiagnosticWerLocalDumpCapture)' != 'Enabled'"
+           Text="PCCrashDiagnosticWerLocalDumpCapture must be Disabled or Enabled." />
+    <Error Condition="'$(PCCrashDiagnosticStage)' == 'Beta1' and '$(PCCrashDiagnosticWerLocalDumpCapture)' == 'Enabled'"
+           Text="Per-application WER LocalDumps capture cannot be enabled in Beta1." />
+  </Target>
+</Project>

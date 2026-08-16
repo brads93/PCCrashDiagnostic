@@ -1,0 +1,30 @@
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+  <System>
+    <Provider Name="Microsoft-Windows-Kernel-EventTracing" Guid="{B675EC37-BDB6-4648-BC92-F3FDC74D3CA2}" />
+    <EventID>28</EventID>
+    <Version>0</Version>
+    <Level>2</Level>
+    <Task>3</Task>
+    <Opcode>25</Opcode>
+    <Keywords>0x8000000000000000</Keywords>
+    <TimeCreated SystemTime="2026-08-02T04:42:18.1250000Z" />
+    <EventRecordID>7001</EventRecordID>
+    <Correlation ActivityID="{AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE}" />
+    <Execution ProcessID="4" ThreadID="88" />
+    <Channel>Microsoft-Windows-Kernel-EventTracing/Admin</Channel>
+    <Computer>FRIEND-PC.example.invalid</Computer>
+  </System>
+  <EventData>
+    <Data Name="ProviderGuid">{8444A4FB-D8D3-4F38-84F8-89960A1EF12F}</Data>
+    <Data Name="ErrorCode">3221225473</Data>
+  </EventData>
+  <RenderingInfo Culture="en-US">
+    <Message>Error setting traits on Provider {8444a4fb-d8d3-4f38-84f8-89960a1ef12f}. Error: 0xC0000001</Message>
+    <Level>Error</Level>
+    <Task>Provider</Task>
+    <Opcode>SetTraits</Opcode>
+    <Channel>Microsoft-Windows-Kernel-EventTracing/Admin</Channel>
+    <Provider>Microsoft-Windows-Kernel-EventTracing</Provider>
+  </RenderingInfo>
+</Event>
+

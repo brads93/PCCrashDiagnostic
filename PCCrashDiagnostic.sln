@@ -1,0 +1,36 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PCCrashDiagnostic.Core", "src\BF6CrashDiagnostic.Core\BF6CrashDiagnostic.Core.csproj", "{7A73EF40-37BA-43AF-A0A5-C164AA0E8250}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PCCrashDiagnostic.App", "src\BF6CrashDiagnostic.App\BF6CrashDiagnostic.App.csproj", "{75462B4C-3308-4F6E-9693-A4DBF1BDBAD8}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PCCrashDiagnostic.Tests", "tests\BF6CrashDiagnostic.Tests\BF6CrashDiagnostic.Tests.csproj", "{5D3B5072-3B58-4BA8-9D13-23DB7095023B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PCCrashDiagnostic.ElevatedHelper", "src\PCCrashDiagnostic.ElevatedHelper\PCCrashDiagnostic.ElevatedHelper.csproj", "{B90C5DF7-9234-4FBC-9739-72FFEB7E0C05}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+		Release|x64 = Release|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{7A73EF40-37BA-43AF-A0A5-C164AA0E8250}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{7A73EF40-37BA-43AF-A0A5-C164AA0E8250}.Debug|x64.Build.0 = Debug|Any CPU
+		{7A73EF40-37BA-43AF-A0A5-C164AA0E8250}.Release|x64.ActiveCfg = Release|Any CPU
+		{7A73EF40-37BA-43AF-A0A5-C164AA0E8250}.Release|x64.Build.0 = Release|Any CPU
+		{75462B4C-3308-4F6E-9693-A4DBF1BDBAD8}.Debug|x64.ActiveCfg = Debug|x64
+		{75462B4C-3308-4F6E-9693-A4DBF1BDBAD8}.Debug|x64.Build.0 = Debug|x64
+		{75462B4C-3308-4F6E-9693-A4DBF1BDBAD8}.Release|x64.ActiveCfg = Release|x64
+		{75462B4C-3308-4F6E-9693-A4DBF1BDBAD8}.Release|x64.Build.0 = Release|x64
+		{5D3B5072-3B58-4BA8-9D13-23DB7095023B}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{5D3B5072-3B58-4BA8-9D13-23DB7095023B}.Debug|x64.Build.0 = Debug|Any CPU
+		{5D3B5072-3B58-4BA8-9D13-23DB7095023B}.Release|x64.ActiveCfg = Release|Any CPU
+		{5D3B5072-3B58-4BA8-9D13-23DB7095023B}.Release|x64.Build.0 = Release|Any CPU
+		{B90C5DF7-9234-4FBC-9739-72FFEB7E0C05}.Debug|x64.ActiveCfg = Debug|x64
+		{B90C5DF7-9234-4FBC-9739-72FFEB7E0C05}.Debug|x64.Build.0 = Debug|x64
+		{B90C5DF7-9234-4FBC-9739-72FFEB7E0C05}.Release|x64.ActiveCfg = Release|x64
+		{B90C5DF7-9234-4FBC-9739-72FFEB7E0C05}.Release|x64.Build.0 = Release|x64
+	EndGlobalSection
+EndGlobal

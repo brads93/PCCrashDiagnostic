@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Platforms>x64</Platforms>
+    <PlatformTarget>x64</PlatformTarget>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <PublishTrimmed>false</PublishTrimmed>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <AssemblyName>PCCrashDiagnostic</AssemblyName>
+    <RootNamespace>BF6CrashDiagnostic.App</RootNamespace>
+    <AssemblyTitle>PC Crash Diagnostic</AssemblyTitle>
+    <Product>PC Crash Diagnostic</Product>
+    <Description>Local Windows crash and blue-screen evidence collector.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\BF6CrashDiagnostic.Core\BF6CrashDiagnostic.Core.csproj" />
+    <AssemblyMetadata Include="PCCrashDiagnostic.ExpectedElevatedHelperSha256"
+                      Value="$(ExpectedElevatedHelperSha256)"
+                      Condition="'$(ExpectedElevatedHelperSha256)' != ''" />
+  </ItemGroup>
+</Project>

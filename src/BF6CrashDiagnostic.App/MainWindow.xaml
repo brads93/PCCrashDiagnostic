@@ -1,0 +1,909 @@
+<Window x:Class="BF6CrashDiagnostic.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:controls="clr-namespace:BF6CrashDiagnostic.App.Controls"
+        mc:Ignorable="d"
+        Title="PC Crash Diagnostic"
+        Width="1220"
+        Height="840"
+        MinWidth="920"
+        MinHeight="680"
+        WindowStartupLocation="CenterScreen"
+        Loaded="Window_Loaded"
+        Closing="Window_Closing"
+        AutomationProperties.Name="PC Crash Diagnostic">
+    <Grid Background="{StaticResource WindowBrush}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="72" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0" Background="#0E151F" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1">
+            <Grid Margin="28,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <Border Width="38" Height="38" CornerRadius="9" Background="{StaticResource AccentStrongBrush}">
+                    <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="14" FontWeight="Bold" Text="PC" />
+                </Border>
+                <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
+                    <TextBlock FontSize="17" FontWeight="SemiBold" Text="PC Crash Diagnostic" />
+                    <TextBlock FontSize="11" Foreground="{StaticResource MutedTextBrush}" Text="{Binding AppVersionLabel}" />
+                </StackPanel>
+                <StackPanel Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Center">
+                    <TextBlock HorizontalAlignment="Right" FontSize="12" Foreground="{StaticResource SuccessBrush}" Text="● Reports stay on this PC · no uploads" />
+                            <TextBlock HorizontalAlignment="Right" FontSize="11" Foreground="{StaticResource MutedTextBrush}" Text="Main app runs without administrator access" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="1">
+            <!-- Start -->
+            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                          Visibility="{Binding IsStartView, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <Grid Margin="34,28,34,42" MaxWidth="1260" HorizontalAlignment="Stretch">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <StackPanel>
+                        <TextBlock FontSize="30" FontWeight="SemiBold" Text="What happened?" />
+                        <TextBlock Margin="0,7,0,0" FontSize="14" Foreground="{StaticResource MutedTextBrush}"
+                                   Text="Choose the event you want to review." />
+                    </StackPanel>
+
+                    <Grid Grid.Row="1" Margin="0,24,0,0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="14" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="14" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <Button Grid.Row="0" Grid.Column="0" Padding="20" MinHeight="110"
+                                HorizontalContentAlignment="Left" Style="{StaticResource ButtonBaseStyle}"
+                                Command="{Binding ShowSystemCrashCommand}">
+                            <StackPanel>
+                                <TextBlock FontSize="18" FontWeight="SemiBold" Text="Windows restarted or showed a blue screen" TextWrapping="Wrap" />
+                                <TextBlock Margin="0,7,0,0" Foreground="{StaticResource MutedTextBrush}"
+                                           Text="Review bugcheck, hardware, display, and shutdown records." TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Button>
+
+                        <Button Grid.Row="0" Grid.Column="2" Padding="20" MinHeight="110"
+                                HorizontalContentAlignment="Left" Style="{StaticResource ButtonBaseStyle}"
+                                Command="{Binding ShowApplicationCrashCommand}">
+                            <StackPanel>
+                                <TextBlock FontSize="18" FontWeight="SemiBold" Text="An app or game closed or froze" TextWrapping="Wrap" />
+                                <TextBlock Margin="0,7,0,0" Foreground="{StaticResource MutedTextBrush}"
+                                           Text="Choose the app and review matching Windows records." TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Button>
+
+                        <Button Grid.Row="2" Grid.Column="0" Padding="20" MinHeight="110"
+                                HorizontalContentAlignment="Left" Style="{StaticResource ButtonBaseStyle}"
+                                Command="{Binding ShowMonitorCommand}">
+                            <StackPanel>
+                                <TextBlock FontSize="18" FontWeight="SemiBold" Text="Monitor an app for the next problem" TextWrapping="Wrap" />
+                                <TextBlock Margin="0,7,0,0" Foreground="{StaticResource MutedTextBrush}"
+                                           Text="Record Windows counters until the selected app exits." TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Button>
+
+                        <Button Grid.Row="2" Grid.Column="2" Padding="20" MinHeight="110"
+                                HorizontalContentAlignment="Left" Style="{StaticResource ButtonBaseStyle}"
+                                Command="{Binding ShowPreviousReportsCommand}">
+                            <StackPanel>
+                                <TextBlock FontSize="18" FontWeight="SemiBold" Text="Open a previous report" TextWrapping="Wrap" />
+                                <TextBlock Margin="0,7,0,0" Foreground="{StaticResource MutedTextBrush}"
+                                           Text="Review a report stored by this app." TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Button>
+                    </Grid>
+
+                    <Border Grid.Row="2" Margin="0,22,0,0" Padding="18" CornerRadius="10"
+                            Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource AccentBrush}" BorderThickness="1"
+                            Visibility="{Binding HasRestorableSettings, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock FontSize="18" FontWeight="SemiBold" Text="Earlier settings can be restored" />
+                                <TextBlock Margin="0,5,18,0" Foreground="{StaticResource MutedTextBrush}"
+                                           Text="{Binding RestorableSettingsSummary}" TextWrapping="Wrap" />
+                                <TextBlock Margin="0,3,18,0" FontSize="11" Foreground="{StaticResource MutedTextBrush}"
+                                           Text="Windows will ask for administrator approval before anything is restored." TextWrapping="Wrap" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" MinWidth="250">
+                                <Button Style="{StaticResource ButtonBaseStyle}"
+                                        Command="{Binding RestoreSavedCrashCaptureCommand}"
+                                        Content="Restore Windows crash settings…"
+                                        Visibility="{Binding HasRestorableCrashCapture, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                <StackPanel Margin="0,8,0,0"
+                                            Visibility="{Binding HasRestorablePerAppCrashCapture, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                    <ComboBox Margin="0,0,0,8"
+                                              ItemsSource="{Binding RestorablePerAppCaptureReceipts}"
+                                              SelectedItem="{Binding SelectedRestorablePerAppCaptureReceipt}"
+                                              DisplayMemberPath="DisplayName"
+                                              AutomationProperties.Name="App settings to restore" />
+                                    <Button Style="{StaticResource ButtonBaseStyle}"
+                                            Command="{Binding RestoreSavedPerAppCrashCaptureCommand}"
+                                            Content="Restore selected app settings…" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <Border Grid.Row="3" Margin="0,22,0,0" Style="{StaticResource CardStyle}"
+                            Visibility="{Binding IsIncidentPanelVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <StackPanel>
+                                <TextBlock FontSize="21" FontWeight="SemiBold" Text="{Binding IncidentSetupTitle}" />
+                                <TextBlock Margin="0,5,0,0" Foreground="{StaticResource MutedTextBrush}"
+                                           Text="{Binding IncidentSetupDetail}" />
+                            </StackPanel>
+
+                            <controls:TargetPicker Grid.Row="1" Margin="0,18,0,0"
+                                                   Visibility="{Binding IsApplicationIncident, Converter={StaticResource BooleanToVisibilityConverter}}" />
+
+                            <StackPanel Grid.Row="2" Margin="0,18,0,0">
+                                <TextBlock FontWeight="SemiBold" Text="Search period" />
+                                <ComboBox Margin="0,8,0,14" ItemsSource="{Binding IncidentLookbackOptions}"
+                                          SelectedItem="{Binding SelectedLookback}"
+                                          DisplayMemberPath="Label"
+                                          AutomationProperties.Name="Incident time range" />
+                                <TextBlock FontWeight="SemiBold" Text="Windows incident" />
+                                <Grid Margin="0,8,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <ComboBox ItemsSource="{Binding RecentIncidents}"
+                                              SelectedItem="{Binding SelectedIncident}"
+                                              DisplayMemberPath="DisplayText"
+                                              AutomationProperties.Name="Recent incidents" />
+                                    <Button Grid.Column="1" Margin="8,0,0,0" Style="{StaticResource ButtonBaseStyle}"
+                                            Command="{Binding RefreshIncidentsCommand}" Content="Search again" />
+                                </Grid>
+                            </StackPanel>
+
+                            <StackPanel Grid.Row="3" Margin="0,16,0,0">
+                                <RadioButton IsChecked="{Binding UseAutomaticCrashTime}" Content="Use the selected incident" />
+                                <RadioButton Margin="0,10,0,0" IsChecked="{Binding UseManualCrashTime}" Content="Enter the date and time instead" />
+                                <Grid Margin="22,10,0,0"
+                                      Visibility="{Binding UseManualCrashTime, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="12" />
+                                        <ColumnDefinition Width="170" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                        <TextBlock Margin="0,0,0,5" FontSize="12" Foreground="{StaticResource MutedTextBrush}" Text="Date" />
+                                        <DatePicker SelectedDate="{Binding SelectedCrashDate}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Margin="0,0,0,5" FontSize="12" Foreground="{StaticResource MutedTextBrush}" Text="Local time" />
+                                        <TextBox Text="{Binding ManualCrashTimeText, UpdateSourceTrigger=PropertyChanged}" />
+                                    </StackPanel>
+                                </Grid>
+                                <TextBlock Margin="22,7,0,0" Foreground="{StaticResource DangerBrush}"
+                                           Text="{Binding ManualTimeValidation}" TextWrapping="Wrap" />
+                            </StackPanel>
+
+                            <Grid Grid.Row="4" Margin="0,18,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock VerticalAlignment="Center" Foreground="{StaticResource MutedTextBrush}"
+                                           Text="{Binding SetupMessage}" TextWrapping="Wrap" />
+                                <Button Grid.Column="1" MinWidth="170" Style="{StaticResource PrimaryButtonStyle}"
+                                        Command="{Binding AnalyzeSelectedIncidentCommand}" Content="Analyze incident" />
+                            </Grid>
+                        </Grid>
+                    </Border>
+
+                    <Border Grid.Row="3" Margin="0,22,0,0" Style="{StaticResource CardStyle}"
+                            Visibility="{Binding IsMonitorPanelVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <StackPanel>
+                                <TextBlock FontSize="21" FontWeight="SemiBold" Text="Monitor an application" />
+                                <TextBlock Margin="0,5,0,0" Foreground="{StaticResource MutedTextBrush}"
+                                           Text="Choose the app to watch. It can already be running or started later." />
+                            </StackPanel>
+                            <controls:TargetPicker Grid.Row="1" Margin="0,18,0,0" />
+                            <Grid Grid.Row="2" Margin="0,18,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Foreground="{StaticResource MutedTextBrush}" Text="{Binding SetupMessage}" TextWrapping="Wrap" />
+                                    <TextBlock Margin="0,5,0,0" FontSize="11" Foreground="{StaticResource SuccessBrush}"
+                                               Text="Reads Windows counters only. It does not hook or inject into the app." />
+                                </StackPanel>
+                                <Button Grid.Column="1" MinWidth="170" Style="{StaticResource PrimaryButtonStyle}"
+                                        Command="{Binding StartMonitoringCommand}" Content="Start monitoring" />
+                            </Grid>
+                        </Grid>
+                    </Border>
+
+                    <Border Grid.Row="3" Margin="0,22,0,0" Style="{StaticResource CardStyle}"
+                            Visibility="{Binding IsPreviousReportsPanelVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <StackPanel>
+                                <TextBlock FontSize="21" FontWeight="SemiBold" Text="Previous reports" />
+                                <TextBlock Margin="0,5,0,0" Foreground="{StaticResource MutedTextBrush}"
+                                           Text="Reports stored in the local app-data folder." />
+                            </StackPanel>
+                            <StackPanel Grid.Row="1" Margin="0,16,0,0">
+                                <Border Margin="0,0,0,12" Padding="12" CornerRadius="8"
+                                        Background="{StaticResource SurfaceRaisedBrush}"
+                                        Visibility="{Binding HasRecurringIncidentGroups, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                    <StackPanel>
+                                        <TextBlock FontWeight="SemiBold" Text="Repeated patterns" />
+                                        <TextBlock Margin="0,3,0,8" FontSize="11" Foreground="{StaticResource MutedTextBrush}"
+                                                   Text="Grouped from reports still stored on this PC." />
+                                        <ItemsControl ItemsSource="{Binding RecurringIncidentGroups}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <StackPanel Margin="0,3">
+                                                        <TextBlock FontWeight="SemiBold" Text="{Binding Title}" TextWrapping="Wrap" />
+                                                        <TextBlock FontSize="11" Foreground="{StaticResource MutedTextBrush}"
+                                                                   Text="{Binding Detail}" TextWrapping="Wrap" />
+                                                    </StackPanel>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </Border>
+                                <ListBox MinHeight="120" MaxHeight="260"
+                                         ItemsSource="{Binding PreviousReports}" SelectedItem="{Binding SelectedPreviousReport}">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <StackPanel>
+                                                <TextBlock FontWeight="SemiBold" Text="{Binding DisplayText}" TextWrapping="Wrap" />
+                                                <TextBlock Margin="0,3,0,0" FontSize="11" Foreground="{StaticResource MutedTextBrush}"
+                                                           Text="{Binding Detail}" TextWrapping="Wrap" />
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </StackPanel>
+                            <Grid Grid.Row="2" Margin="0,14,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock VerticalAlignment="Center" Foreground="{StaticResource MutedTextBrush}"
+                                           Text="{Binding SetupMessage}" />
+                                <Button Grid.Column="1" MinWidth="150" Style="{StaticResource PrimaryButtonStyle}"
+                                        Command="{Binding OpenPreviousReportCommand}" Content="Open report" />
+                            </Grid>
+                        </Grid>
+                    </Border>
+
+                    <Expander Grid.Row="4" Margin="0,22,0,0" Header="System details">
+                        <Border Margin="0,10,0,0" Style="{StaticResource CardStyle}">
+                            <StackPanel>
+                                <TextBlock Margin="0,0,0,14" Foreground="{StaticResource MutedTextBrush}"
+                                           Text="{Binding SystemCoverageSummary}" />
+                                <ItemsControl ItemsSource="{Binding SystemFacts}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Margin="0,0,0,11">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="125" />
+                                                    <ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Foreground="{StaticResource MutedTextBrush}" Text="{Binding Label}" />
+                                                <StackPanel Grid.Column="1">
+                                                    <TextBlock FontWeight="SemiBold" Text="{Binding Value}" TextWrapping="Wrap" />
+                                                    <TextBlock Margin="0,2,0,0" FontSize="11" Foreground="{StaticResource MutedTextBrush}"
+                                                               Text="{Binding Hint}" TextWrapping="Wrap" />
+                                                </StackPanel>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Border>
+                    </Expander>
+
+                    <TextBlock Grid.Row="5" Margin="0,24,0,0" HorizontalAlignment="Center"
+                               Foreground="{StaticResource MutedTextBrush}" FontSize="11"
+                               Text="Diagnostics are read-only. Optional crash-capture setup changes Windows only after you review it and approve UAC." />
+                </Grid>
+            </ScrollViewer>
+
+            <!-- Collecting -->
+            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                          Visibility="{Binding IsCollectingView, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <Grid Margin="34,28,34,42" MaxWidth="1260" HorizontalAlignment="Stretch">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <ItemsControl ItemsSource="{Binding WorkflowSteps}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate><UniformGrid Rows="1" Columns="4" /></ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border x:Name="StepBorder" Margin="0,0,10,0" Padding="12" CornerRadius="8"
+                                        Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="32" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Border x:Name="StepBadge" Width="26" Height="26" CornerRadius="13"
+                                                Background="{StaticResource SurfaceRaisedBrush}">
+                                            <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="11" FontWeight="Bold" Text="{Binding Number}" />
+                                        </Border>
+                                        <StackPanel Grid.Column="1" Margin="8,0,0,0">
+                                            <TextBlock FontWeight="SemiBold" Text="{Binding Title}" />
+                                            <TextBlock Margin="0,2,0,0" FontSize="10" Foreground="{StaticResource MutedTextBrush}" Text="{Binding State}" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                                <DataTemplate.Triggers>
+                                    <DataTrigger Binding="{Binding IsCurrent}" Value="True">
+                                        <Setter TargetName="StepBorder" Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+                                        <Setter TargetName="StepBadge" Property="Background" Value="{StaticResource AccentStrongBrush}" />
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding IsComplete}" Value="True">
+                                        <Setter TargetName="StepBorder" Property="BorderBrush" Value="{StaticResource SuccessBrush}" />
+                                    </DataTrigger>
+                                </DataTemplate.Triggers>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <Border Grid.Row="1" Margin="0,22,0,0" Style="{StaticResource CardStyle}" Padding="22">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock FontSize="22" FontWeight="SemiBold" Text="{Binding StatusTitle}"
+                                           AutomationProperties.LiveSetting="Polite" />
+                                <TextBlock Margin="0,5,0,0" Foreground="{StaticResource MutedTextBrush}"
+                                           Text="{Binding StatusDetail}" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite" />
+                                <ProgressBar Margin="0,16,0,0" Value="{Binding ProgressValue, Mode=OneWay}"
+                                             IsIndeterminate="{Binding IsProgressIndeterminate}" />
+                            </StackPanel>
+                            <Button Grid.Column="1" Width="110" Margin="20,0,0,0" VerticalAlignment="Center"
+                                    Style="{StaticResource DangerButtonStyle}" Command="{Binding CancelCommand}" Content="Cancel" />
+                        </Grid>
+                    </Border>
+
+                    <Border Grid.Row="2" Margin="0,22,0,0" Style="{StaticResource CardStyle}"
+                            Visibility="{Binding IsMonitoring, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="230" />
+                            </Grid.RowDefinitions>
+                            <DockPanel>
+                                <StackPanel DockPanel.Dock="Left">
+                                    <TextBlock FontSize="18" FontWeight="SemiBold" Text="Session counters" />
+                                    <TextBlock Margin="0,4,0,0" Foreground="{StaticResource MutedTextBrush}"
+                                               Text="Five-second samples · last ten minutes" />
+                                </StackPanel>
+                                <TextBlock HorizontalAlignment="Right" VerticalAlignment="Bottom" FontSize="11"
+                                           Foreground="{StaticResource MutedTextBrush}" Text="{Binding LastUpdatedText}" />
+                            </DockPanel>
+                            <ItemsControl Grid.Row="1" Margin="0,16,0,14" ItemsSource="{Binding TelemetryCards}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate><UniformGrid Rows="1" Columns="4" /></ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Margin="0,0,8,0" Padding="12" CornerRadius="8" Background="{StaticResource SurfaceRaisedBrush}">
+                                            <StackPanel>
+                                                <TextBlock FontSize="11" Foreground="{StaticResource MutedTextBrush}" Text="{Binding Label}" />
+                                                <TextBlock Margin="0,4,0,0" FontSize="20" FontWeight="SemiBold" Text="{Binding Value}" />
+                                                <TextBlock Margin="0,3,0,0" FontSize="10" Foreground="{StaticResource MutedTextBrush}"
+                                                           Text="{Binding Hint}" TextWrapping="Wrap" />
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <Grid Grid.Row="2">
+                                <controls:TelemetryChart Samples="{Binding TelemetryHistory}"
+                                                         AutomationProperties.Name="Live system and target memory chart" />
+                                <StackPanel Margin="48,7,50,0" HorizontalAlignment="Right" VerticalAlignment="Top"
+                                            Orientation="Horizontal" IsHitTestVisible="False">
+                                    <TextBlock Foreground="#55C2FF" FontSize="11" Text="● RAM" />
+                                    <TextBlock Margin="12,0,0,0" Foreground="#FFCB66" FontSize="11" Text="● Commit" />
+                                    <TextBlock Margin="12,0,0,0" Foreground="#66D6A0" FontSize="11" Text="● Target" />
+                                    <TextBlock Margin="12,0,0,0" Foreground="#C792EA" FontSize="11" Text="● VRAM" />
+                                </StackPanel>
+                            </Grid>
+                        </Grid>
+                    </Border>
+
+                    <TextBlock Grid.Row="3" Margin="0,20,0,0" HorizontalAlignment="Center"
+                               FontSize="11" Foreground="{StaticResource MutedTextBrush}"
+                               Text="The app reads Windows records and counters. It does not change the selected app." />
+                </Grid>
+            </ScrollViewer>
+
+            <!-- Results -->
+            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                          Visibility="{Binding IsResultsView, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <Grid Margin="34,28,34,42" MaxWidth="1260" HorizontalAlignment="Stretch">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock FontSize="29" FontWeight="SemiBold" Text="Report ready" />
+                            <TextBlock Margin="0,6,0,0" FontSize="16" Text="{Binding ResultIncidentTitle}" TextWrapping="Wrap" />
+                            <TextBlock Margin="0,5,0,0" Foreground="{StaticResource MutedTextBrush}"
+                                       Text="{Binding ResultCompletionDetail}" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <WrapPanel Grid.Column="1" Margin="24,0,0,0" VerticalAlignment="Top">
+                            <Button Margin="0,0,8,0" Style="{StaticResource ButtonBaseStyle}"
+                                    Command="{Binding StartOverCommand}" Content="Start over" />
+                            <Button MinWidth="170" Style="{StaticResource PrimaryButtonStyle}"
+                                    Command="{Binding ReviewExportCommand}" Content="Review &amp; export" />
+                        </WrapPanel>
+                    </Grid>
+
+                    <Grid Grid.Row="1" Margin="0,20,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="12" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="12" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Border Padding="14" CornerRadius="8" Background="{StaticResource SurfaceRaisedBrush}">
+                            <StackPanel>
+                                <TextBlock FontSize="11" Foreground="{StaticResource MutedTextBrush}" Text="TARGET" />
+                                <TextBlock Margin="0,4,0,0" FontWeight="SemiBold" Text="{Binding ResultTargetName}" />
+                            </StackPanel>
+                        </Border>
+                        <Border Grid.Column="2" Padding="14" CornerRadius="8" Background="{StaticResource SurfaceRaisedBrush}">
+                            <StackPanel>
+                                <TextBlock FontSize="11" Foreground="{StaticResource MutedTextBrush}" Text="TIME WINDOW" />
+                                <TextBlock Margin="0,4,0,0" FontWeight="SemiBold" Text="{Binding ResultTimeRange}" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+                        <Border Grid.Column="4" Padding="14" CornerRadius="8" Background="{StaticResource SurfaceRaisedBrush}">
+                            <StackPanel>
+                                <TextBlock FontSize="11" Foreground="{StaticResource MutedTextBrush}" Text="COVERAGE" />
+                                <TextBlock Margin="0,4,0,0" FontWeight="SemiBold" Text="{Binding CoverageSummary}" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+
+                    <Border Grid.Row="2" Margin="0,22,0,0" Style="{StaticResource CardStyle}" BorderBrush="{StaticResource AccentBrush}">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock FontSize="20" FontWeight="SemiBold" Text="Crash capture readiness" />
+                                    <TextBlock Margin="0,4,0,0" Foreground="{StaticResource MutedTextBrush}"
+                                               Text="{Binding CrashReadinessCapturedText}" TextWrapping="Wrap" />
+                                </StackPanel>
+                                <Border Grid.Column="1" Margin="18,0,0,0" Padding="12,7" CornerRadius="16"
+                                        Background="{StaticResource SurfaceRaisedBrush}" BorderBrush="{StaticResource AccentBrush}" BorderThickness="1">
+                                    <TextBlock FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}"
+                                               Text="{Binding CrashReadinessStatus}" />
+                                </Border>
+                            </Grid>
+
+                            <Grid Grid.Row="1" Margin="0,16,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="180" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock FontSize="11" FontWeight="Bold" Foreground="{StaticResource MutedTextBrush}" Text="WINDOWS DUMP TYPE" />
+                                    <TextBlock Margin="0,4,0,0" FontWeight="SemiBold" Text="{Binding CrashReadinessDumpType}" TextWrapping="Wrap" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Margin="18,0,0,0">
+                                    <TextBlock FontSize="11" FontWeight="Bold" Foreground="{StaticResource MutedTextBrush}" Text="WHAT THIS MEANS" />
+                                    <TextBlock Margin="0,4,0,0" Text="{Binding CrashReadinessDetail}" TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Grid>
+
+                            <Grid Grid.Row="2" Margin="0,16,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="14" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Border Padding="13" CornerRadius="8" Background="{StaticResource SurfaceRaisedBrush}">
+                                    <StackPanel>
+                                        <TextBlock FontSize="11" Foreground="{StaticResource MutedTextBrush}" Text="STORAGE" />
+                                        <TextBlock Margin="0,4,0,0" Text="{Binding CrashReadinessBackingStorage}" TextWrapping="Wrap" />
+                                        <TextBlock Margin="0,3,0,0" Foreground="{StaticResource MutedTextBrush}" Text="{Binding CrashReadinessFreeSpace}" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </Border>
+                                <Border Grid.Column="2" Padding="13" CornerRadius="8" Background="{StaticResource SurfaceRaisedBrush}">
+                                    <StackPanel>
+                                        <TextBlock FontSize="11" Foreground="{StaticResource MutedTextBrush}" Text="AFTER A SYSTEM CRASH" />
+                                        <TextBlock Margin="0,4,0,0" Text="{Binding CrashReadinessEventLogging}" TextWrapping="Wrap" />
+                                        <TextBlock Margin="0,3,0,0" Foreground="{StaticResource MutedTextBrush}" Text="{Binding CrashReadinessAutomaticRestart}" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+
+                            <Grid Grid.Row="3" Margin="0,16,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Foreground="{StaticResource MutedTextBrush}"
+                                               Text="{Binding CrashPreparationAvailability}" TextWrapping="Wrap" />
+                                    <TextBlock Margin="0,8,0,0" Foreground="{StaticResource MutedTextBrush}"
+                                               Text="{Binding CrashPreparationMessage}" TextWrapping="Wrap"
+                                               Visibility="{Binding IsCrashPreparationNotice, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                    <TextBlock Margin="0,8,0,0" Foreground="{StaticResource SuccessBrush}"
+                                               Text="{Binding CrashPreparationMessage}" TextWrapping="Wrap"
+                                               Visibility="{Binding IsCrashPreparationSuccess, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                    <TextBlock Margin="0,8,0,0" Foreground="{StaticResource DangerBrush}"
+                                               Text="{Binding CrashPreparationMessage}" TextWrapping="Wrap"
+                                               Visibility="{Binding IsCrashPreparationFailure, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                    <TextBlock Margin="0,6,0,0" Foreground="{StaticResource WarningBrush}" FontWeight="SemiBold"
+                                               Text="Restart Windows before relying on the new capture settings."
+                                               Visibility="{Binding IsCrashPreparationPendingRestart, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                    <Expander Margin="0,12,0,0" Header="Advanced app crash capture"
+                                              Visibility="{Binding ShowPerAppCrashCapture, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                        <StackPanel Margin="0,9,0,0">
+                                            <TextBlock Foreground="{StaticResource MutedTextBrush}"
+                                                       Text="{Binding PerAppCrashCaptureAvailability}" TextWrapping="Wrap" />
+                                            <TextBlock Margin="0,6,0,0" Foreground="{StaticResource MutedTextBrush}"
+                                                       Text="{Binding PerAppCrashCaptureMessage}" TextWrapping="Wrap"
+                                                       Visibility="{Binding IsPerAppCrashCaptureNotice, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                            <TextBlock Margin="0,6,0,0" Foreground="{StaticResource SuccessBrush}"
+                                                       Text="{Binding PerAppCrashCaptureMessage}" TextWrapping="Wrap"
+                                                       Visibility="{Binding IsPerAppCrashCaptureSuccess, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                            <TextBlock Margin="0,6,0,0" Foreground="{StaticResource DangerBrush}"
+                                                       Text="{Binding PerAppCrashCaptureMessage}" TextWrapping="Wrap"
+                                                       Visibility="{Binding IsPerAppCrashCaptureFailure, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                            <WrapPanel Margin="0,10,0,0">
+                                                <Button Margin="0,0,8,0" Style="{StaticResource ButtonBaseStyle}"
+                                                        Command="{Binding EnablePerAppCrashCaptureCommand}"
+                                                        Content="Enable full app crash dumps…"
+                                                        Visibility="{Binding ShowEnablePerAppCrashCapture, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                                <Button Style="{StaticResource ButtonBaseStyle}"
+                                                        Command="{Binding RestorePerAppCrashCaptureCommand}"
+                                                        Content="Restore earlier app settings…"
+                                                        Visibility="{Binding CanRestorePerAppCrashCapture, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                            </WrapPanel>
+                                        </StackPanel>
+                                    </Expander>
+                                </StackPanel>
+                                <WrapPanel Grid.Column="1" Margin="20,0,0,0" VerticalAlignment="Bottom">
+                                    <Button Margin="0,0,8,0" Style="{StaticResource ButtonBaseStyle}"
+                                            Command="{Binding RestoreCrashCaptureCommand}" Content="Undo last change…"
+                                            Visibility="{Binding CanRestoreCrashPreparation, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                    <Button MinWidth="210" Style="{StaticResource PrimaryButtonStyle}"
+                                            Command="{Binding PrepareCrashCaptureCommand}" Content="Prepare for the next crash…" />
+                                </WrapPanel>
+                            </Grid>
+                        </Grid>
+                    </Border>
+
+                    <StackPanel Grid.Row="3" Margin="0,25,0,0">
+                        <TextBlock FontSize="22" FontWeight="SemiBold" Text="Evidence found" />
+                        <TextBlock Margin="0,4,0,13" Foreground="{StaticResource MutedTextBrush}"
+                                   Text="Higher-priority Windows records appear first. Their order does not identify the cause." />
+                        <ItemsControl ItemsSource="{Binding Findings}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Margin="0,0,0,12" Padding="18" Style="{StaticResource CardStyle}">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="48" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <Border Width="36" Height="36" CornerRadius="18" VerticalAlignment="Top"
+                                                    Background="{StaticResource SurfaceRaisedBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1">
+                                                <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="Bold" Text="{Binding Rank}" />
+                                            </Border>
+                                            <Grid Grid.Column="1">
+                                                <Grid.RowDefinitions>
+                                                    <RowDefinition Height="Auto" />
+                                                    <RowDefinition Height="Auto" />
+                                                    <RowDefinition Height="Auto" />
+                                                </Grid.RowDefinitions>
+                                                <DockPanel>
+                                                    <StackPanel DockPanel.Dock="Right" HorizontalAlignment="Right">
+                                                        <TextBlock HorizontalAlignment="Right" FontSize="11" Foreground="{StaticResource AccentBrush}"
+                                                                   Text="{Binding EvidenceStrength}" />
+                                                        <TextBlock Margin="0,2,0,0" HorizontalAlignment="Right" FontSize="10"
+                                                                   Foreground="{StaticResource MutedTextBrush}" Text="{Binding Impact}" />
+                                                    </StackPanel>
+                                                    <StackPanel Margin="0,0,16,0">
+                                                        <TextBlock FontSize="17" FontWeight="SemiBold" Text="{Binding Title}" TextWrapping="Wrap" />
+                                                        <TextBlock Margin="0,4,0,0" FontSize="11" Foreground="{StaticResource MutedTextBrush}"
+                                                                   Text="{Binding OccurrenceSummary}" />
+                                                    </StackPanel>
+                                                </DockPanel>
+                                                <Grid Grid.Row="1" Margin="0,14,0,0">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="16" />
+                                                        <ColumnDefinition Width="*" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel>
+                                                        <TextBlock FontSize="11" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" Text="OBSERVED" />
+                                                        <TextBlock Margin="0,4,0,0" Text="{Binding Evidence}" TextWrapping="Wrap" />
+                                                    </StackPanel>
+                                                    <StackPanel Grid.Column="2">
+                                        <TextBlock FontSize="11" FontWeight="Bold" Foreground="{StaticResource SuccessBrush}" Text="POSSIBLE RELEVANCE" />
+                                                        <TextBlock Margin="0,4,0,0" Text="{Binding Interpretation}" TextWrapping="Wrap" />
+                                                    </StackPanel>
+                                                </Grid>
+                                                <Grid Grid.Row="2" Margin="0,14,0,0">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="16" />
+                                                        <ColumnDefinition Width="*" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel>
+                                                        <TextBlock FontSize="11" FontWeight="Bold" Foreground="{StaticResource WarningBrush}" Text="DOES NOT ESTABLISH" />
+                                                        <TextBlock Margin="0,4,0,0" Foreground="{StaticResource MutedTextBrush}"
+                                                                   Text="{Binding DoesNotEstablish}" TextWrapping="Wrap" />
+                                                    </StackPanel>
+                                                    <StackPanel Grid.Column="2">
+                                                        <TextBlock FontSize="11" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" Text="NEXT CHECK" />
+                                                        <TextBlock Margin="0,4,0,0" Text="{Binding NextCheck}" TextWrapping="Wrap" />
+                                                    </StackPanel>
+                                                </Grid>
+                                            </Grid>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <Border Style="{StaticResource CardStyle}"
+                                Visibility="{Binding HasNoFindings, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <StackPanel>
+                                <TextBlock FontSize="17" FontWeight="SemiBold" Text="No cause identified" />
+                                <TextBlock Margin="0,5,0,0" Foreground="{StaticResource MutedTextBrush}"
+                                           Text="No cause was identified in the Windows records this app could read." TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+
+                    <Border Grid.Row="4" Margin="0,4,0,0" Style="{StaticResource CardStyle}"
+                            Visibility="{Binding HasCollectionIssues, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <StackPanel>
+                            <TextBlock FontWeight="SemiBold" Text="Unavailable data" />
+                            <TextBlock Margin="0,4,0,8" Foreground="{StaticResource MutedTextBrush}"
+                                       Text="These sources were not used as negative evidence." />
+                            <ItemsControl ItemsSource="{Binding CollectionIssues}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate><TextBlock Margin="0,3" Text="{Binding}" TextWrapping="Wrap" /></DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <Border Margin="0,12,0,0" Padding="12" CornerRadius="8"
+                                    Background="{StaticResource SurfaceRaisedBrush}"
+                                    Visibility="{Binding HasProtectedEvidenceSources, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <StackPanel>
+                                    <TextBlock FontWeight="SemiBold" Text="Some Windows data needs administrator access" />
+                                    <TextBlock Margin="0,4,0,0" Foreground="{StaticResource MutedTextBrush}"
+                                               Text="Choose a source, then approve the Windows prompt. The app will add any records or dump-file details it can read to a new local report. It will not change Windows." TextWrapping="Wrap" />
+                                    <ComboBox Margin="0,10,0,0" ItemsSource="{Binding ProtectedEvidenceSources}"
+                                              SelectedItem="{Binding SelectedProtectedEvidenceSource}"
+                                              DisplayMemberPath="DisplayName"
+                                              AutomationProperties.Name="Protected evidence source" />
+                                    <Button Margin="0,10,0,0" HorizontalAlignment="Left"
+                                            Style="{StaticResource ButtonBaseStyle}"
+                                            Command="{Binding RetryProtectedSourceCommand}"
+                                            Content="Retry selected source…" />
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </Border>
+
+                    <Expander Grid.Row="5" Margin="0,18,0,0" Header="System details">
+                        <Border Margin="0,10,0,0" Style="{StaticResource CardStyle}">
+                            <ItemsControl ItemsSource="{Binding SystemFacts}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Margin="0,0,0,10">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="125" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Foreground="{StaticResource MutedTextBrush}" Text="{Binding Label}" />
+                                            <TextBlock Grid.Column="1" FontWeight="SemiBold" Text="{Binding Value}" TextWrapping="Wrap" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </Border>
+                    </Expander>
+
+                    <Expander Grid.Row="6" Margin="0,16,0,0" Header="Advanced: crash dump and WinDbg"
+                              Visibility="{Binding HasDumpChoices, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <Border Margin="0,10,0,0" Style="{StaticResource CardStyle}" BorderBrush="{StaticResource WarningBrush}">
+                            <StackPanel>
+                                <TextBlock FontWeight="SemiBold" Text="Select the dump that belongs to this incident." />
+                                <TextBlock Margin="0,4,0,0" Foreground="{StaticResource MutedTextBrush}"
+                                           Text="When several files match, the app does not choose one from timestamps alone." TextWrapping="Wrap" />
+                                <ComboBox Margin="0,12,0,0" ItemsSource="{Binding DumpChoices}"
+                                          SelectedItem="{Binding SelectedDumpChoice}" DisplayMemberPath="Name"
+                                          AutomationProperties.Name="Crash dump candidates" />
+                                <WrapPanel Margin="0,12,0,0">
+                                    <Button Margin="0,0,8,0" Style="{StaticResource DangerButtonStyle}"
+                                            Command="{Binding PackageDumpCommand}" Content="Create dump ZIP…" />
+                                    <Button Margin="0,0,8,0" Style="{StaticResource ButtonBaseStyle}"
+                                            Command="{Binding InspectProtectedDumpCommand}" Content="Inspect with administrator access…"
+                                            Visibility="{Binding CanInspectProtectedDump, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                    <Button Margin="0,0,8,0" Style="{StaticResource ButtonBaseStyle}"
+                                            Command="{Binding RunDumpCheckCommand}" Content="Validate with DumpChk"
+                                            Visibility="{Binding CanRunDumpCheck, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                    <Button Margin="0,0,8,0" Style="{StaticResource ButtonBaseStyle}"
+                                            Command="{Binding RunDebuggerCommand}" Content="Run WinDbg offline" />
+                                    <Button Style="{StaticResource ButtonBaseStyle}"
+                                            Command="{Binding RetrySymbolsCommand}" Content="Download Microsoft symbols and retry…"
+                                            Visibility="{Binding CanRetryWithMicrosoftSymbols, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                </WrapPanel>
+                                <TextBlock Margin="0,10,0,0" Foreground="{StaticResource MutedTextBrush}"
+                                           Text="{Binding AdvancedDumpToolsNote}" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+                    </Expander>
+                </Grid>
+            </ScrollViewer>
+
+            <!-- Review and export -->
+            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                          Visibility="{Binding IsReviewExportView, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <Grid Margin="34,28,34,42" MaxWidth="1100" HorizontalAlignment="Stretch">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock FontSize="29" FontWeight="SemiBold" Text="Review and export" />
+                            <TextBlock Margin="0,6,0,0" Foreground="{StaticResource MutedTextBrush}"
+                                       Text="{Binding CoverageSummary}" />
+                        </StackPanel>
+                        <Button Grid.Column="1" Style="{StaticResource ButtonBaseStyle}"
+                                Command="{Binding BackToResultsCommand}" Content="Back to results" />
+                    </Grid>
+
+                    <Grid Grid.Row="1" Margin="0,20,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="14" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Border Style="{StaticResource CardStyle}">
+                            <StackPanel>
+                                <TextBlock FontSize="17" FontWeight="SemiBold" Text="Files" />
+                                <TextBlock Margin="0,10,0,0" Foreground="{StaticResource MutedTextBrush}" Text="Report ZIP" />
+                                <TextBlock Margin="0,2,0,0" FontWeight="SemiBold" Text="{Binding OutgoingZipName}" TextWrapping="Wrap" />
+                                <TextBlock Margin="0,10,0,0" Foreground="{StaticResource MutedTextBrush}"
+                                           Text="Only the report ZIP is exported." TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+                        <Border Grid.Column="2" Style="{StaticResource CardStyle}">
+                            <StackPanel>
+                                <TextBlock FontSize="17" FontWeight="SemiBold" Text="Standard report contents" />
+                                <TextBlock Margin="0,10,0,0" Text="• System and driver details" />
+                                <TextBlock Margin="0,5,0,0" Text="• Windows crash-capture readiness" />
+                                <TextBlock Margin="0,5,0,0" Text="• Selected Windows event messages" />
+                                <TextBlock Margin="0,5,0,0" Text="• Session counters when monitoring was used" />
+                                <TextBlock Margin="0,8,0,0" Foreground="{StaticResource SuccessBrush}"
+                                           Text="Crash dump contents are excluded." FontWeight="SemiBold" />
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+
+                    <Border Grid.Row="2" Margin="0,16,0,0" Style="{StaticResource CardStyle}">
+                        <StackPanel>
+                            <TextBlock FontSize="17" FontWeight="SemiBold" Text="Summary" />
+                            <TextBox Margin="0,12,0,0" Height="300" Text="{Binding ReviewSummary, Mode=OneWay}"
+                                     IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap"
+                                     VerticalScrollBarVisibility="Auto" FontFamily="Consolas" FontSize="12"
+                                     AutomationProperties.Name="Report summary" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Grid.Row="3" Margin="0,16,0,0" Padding="16" CornerRadius="8"
+                            Background="#2A2416" BorderBrush="{StaticResource WarningBrush}" BorderThickness="1">
+                        <TextBlock Foreground="{StaticResource WarningBrush}" TextWrapping="Wrap"
+                                   Text="Selected Windows event messages can contain names or file paths. Share the report only with someone you trust." />
+                    </Border>
+
+                    <Grid Grid.Row="4" Margin="0,18,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock VerticalAlignment="Center" Foreground="{StaticResource SuccessBrush}"
+                                   Text="{Binding ExportStatus}" TextWrapping="Wrap" />
+                        <WrapPanel Grid.Column="1">
+                            <Button Margin="0,0,8,0" Style="{StaticResource ButtonBaseStyle}"
+                                    Command="{Binding CopySummaryCommand}" Content="Copy summary" />
+                            <Button Margin="0,0,8,0" Style="{StaticResource ButtonBaseStyle}"
+                                    Command="{Binding OpenFolderCommand}" Content="Open folder" />
+                            <Button MinWidth="160" Style="{StaticResource PrimaryButtonStyle}"
+                                    Command="{Binding ExportCommand}" Content="Export report" />
+                        </WrapPanel>
+                    </Grid>
+                </Grid>
+            </ScrollViewer>
+        </Grid>
+    </Grid>
+</Window>

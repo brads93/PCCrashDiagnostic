@@ -1,0 +1,99 @@
+[
+  {
+    "Name": "generic-status-unsuccessful",
+    "Events": [
+      {
+        "Minute": 0,
+        "Provider": "Microsoft-Windows-Kernel-EventTracing",
+        "ProviderGuid": "8444a4fb-d8d3-4f38-84f8-89960a1ef12f",
+        "EventId": 28,
+        "Message": "Error setting traits on Provider {8444a4fb-d8d3-4f38-84f8-89960a1ef12f}. Error: 0xC0000001",
+        "Data": {
+          "ErrorCode": "3221225473"
+        }
+      }
+    ],
+    "Samples": [],
+    "ExpectedFindingPrefixes": [
+      "etw-provider-traits-"
+    ],
+    "UnexpectedFindingIds": [
+      "rising-memory-trend",
+      "resource-exhaustion",
+      "gpu-timeout"
+    ]
+  },
+  {
+    "Name": "gpu-reset-tdr",
+    "Events": [
+      {
+        "Minute": 0,
+        "Provider": "Display",
+        "EventId": 4101,
+        "Message": "Display driver amdwddmg stopped responding and has successfully recovered.",
+        "Data": {}
+      }
+    ],
+    "Samples": [],
+    "ExpectedFindingPrefixes": [
+      "gpu-timeout"
+    ],
+    "UnexpectedFindingIds": [
+      "rising-memory-trend",
+      "resource-exhaustion"
+    ]
+  },
+  {
+    "Name": "high-but-stable-memory",
+    "Events": [],
+    "Samples": [
+      {
+        "Minute": 0,
+        "PrivateMb": 8192.0,
+        "CommitPct": 90.0
+      },
+      {
+        "Minute": 5,
+        "PrivateMb": 8240.0,
+        "CommitPct": 90.5
+      },
+      {
+        "Minute": 10,
+        "PrivateMb": 8280.0,
+        "CommitPct": 91.0
+      }
+    ],
+    "ExpectedFindingPrefixes": [],
+    "UnexpectedFindingIds": [
+      "rising-memory-trend",
+      "resource-exhaustion"
+    ]
+  },
+  {
+    "Name": "rising-private-memory-and-commit",
+    "Events": [],
+    "Samples": [
+      {
+        "Minute": 0,
+        "PrivateMb": 3072.0,
+        "CommitPct": 40.0
+      },
+      {
+        "Minute": 5,
+        "PrivateMb": 4700.0,
+        "CommitPct": 49.0
+      },
+      {
+        "Minute": 10,
+        "PrivateMb": 6500.0,
+        "CommitPct": 58.0
+      }
+    ],
+    "ExpectedFindingPrefixes": [
+      "rising-memory-trend"
+    ],
+    "UnexpectedFindingIds": [
+      "resource-exhaustion"
+    ]
+  }
+]

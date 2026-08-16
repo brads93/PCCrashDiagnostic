@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <Platforms>AnyCPU;x64</Platforms>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="System.Diagnostics.PerformanceCounter" Version="10.0.10" />
+    <PackageReference Include="System.Management" Version="10.0.10" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="BF6CrashDiagnostic.Tests" />
+  </ItemGroup>
+</Project>

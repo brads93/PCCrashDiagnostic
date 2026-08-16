@@ -1,0 +1,38 @@
+[
+  {
+    "provider": "Microsoft-Windows-Kernel-EventTracing",
+    "eventId": 28,
+    "level": "Error",
+    "timestampUtc": "2026-08-02T04:42:18.1250000Z",
+    "message": "Error setting traits on Provider {8444a4fb-d8d3-4f38-84f8-89960a1ef12f}. Error: 0xC0000001"
+  },
+  {
+    "provider": "Microsoft-Windows-WER-SystemErrorReporting",
+    "eventId": 1001,
+    "level": "Error",
+    "timestampUtc": "2026-08-02T04:45:00.0000000Z",
+    "message": "The computer has rebooted from a bugcheck. The bugcheck was: 0x00000119."
+  },
+  {
+    "provider": "Microsoft-Windows-Kernel-Power",
+    "eventId": 41,
+    "level": "Critical",
+    "timestampUtc": "2026-08-02T04:45:02.0000000Z",
+    "message": "The system has rebooted without cleanly shutting down first."
+  },
+  {
+    "provider": "EventLog",
+    "eventId": 6008,
+    "level": "Error",
+    "timestampUtc": "2026-08-02T04:45:04.0000000Z",
+    "message": "The previous system shutdown was unexpected."
+  },
+  {
+    "provider": "Microsoft-Windows-Kernel-EventTracing",
+    "eventId": 28,
+    "level": "Error",
+    "timestampUtc": "2026-08-02T04:46:00.0000000Z",
+    "message": "Error setting traits on Provider {8444a4fb-d8d3-4f38-84f8-89960a1ef12f}. Error: 0xC0000001"
+  }
+]
+

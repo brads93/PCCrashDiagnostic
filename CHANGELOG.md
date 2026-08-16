@@ -1,0 +1,103 @@
+# Changelog
+
+All notable changes are documented here. This project follows Semantic Versioning for stable releases; prerelease compatibility can change when required to protect privacy or diagnostic correctness.
+
+## 3.1.0-beta.2 - 2026-08-05
+
+### Added
+
+- Advanced per-executable WER LocalDumps setup for confirmed ordinary apps, using full dumps, a two-file retention cap, a fixed private folder, UAC verification, and exact rollback.
+- Bounded dump-quality classifications and optional offline Microsoft-signed DumpChk support.
+- A **Validate with DumpChk** Results action appears only when an approved Microsoft-signed x64 installation is present; its structured result is written into a refreshed report without raw tool output.
+- Seven-day Windows Update and SetupAPI driver-install timing, privacy-filtered storage health, and read-only Driver Verifier detection.
+- Allowlisted WinDbg `!blackboxbsd` and `!blackboxscm` boot/service summaries; raw debugger output remains local.
+- Additive schema-v3 members: `Dump-Quality.json`, `Recent-Changes.json`, `Storage-Health.json`, and `Driver-Verifier.json`.
+
+### Safety
+
+- Distributable packages compile the per-app WER apply path off after review found that Windows' machine-wide, basename-keyed LocalDumps setting could affect a later elevated or system process with the same name. The implementation remains available only through an explicit developer source-build gate for disposable-VM testing; validated legacy restore remains enabled.
+- Per-app setup rejects BF6, anti-cheat/protected profiles, critical Windows executables, and targets without a matching ordinary user-session process at commit.
+- DumpChk, WinDbg, dump inspection, dump packaging, and elevated operations remain blocked or are stopped if the protected BF6 target starts.
+- Driver Verifier is queried only with `/querysettings`; the app never enables, resets, or changes it.
+
+### Changed
+
+- Normal **Export report** copies one report ZIP. The internal report checksum remains in app data, while release-package checksums remain developer-facing.
+- The window header shows the exact compiled version and labels these artifacts as controlled test builds.
+
+## 3.1.0-beta.1 - 2026-08-05
+
+### Added
+
+- **Prepare this PC for the next crash**, with a current-to-proposed preview, one UAC request, post-write verification, restart status, private rollback receipt, and restore controls that survive app and PC restarts.
+- Correct Active Memory Dump recognition through `CrashDumpEnabled=1` plus `FilterPages=1`, with compatibility for raw mode `10`.
+- Configured/runtime page-file, dedicated-dump, actual destination-volume, installed-RAM-aware capacity, and pending-restart readiness checks.
+- Explicit readiness states: Ready, Limited, At risk, Off, Pending restart, and Unavailable.
+
+### Changed
+
+- The friendly preset uses Automatic Memory Dump, `%SystemRoot%\MEMORY.DMP`, event logging, overwrite, and Windows-managed page-file sizing only when existing backing cannot be shown sufficient.
+- The preset clears `FilterPages` but leaves automatic restart, `AlwaysKeepMemoryDump`, the minidump directory, and unrelated recovery settings unchanged.
+- Helper integrity binding remains automatic; the app adds no manual hash-verification step.
+
+### Safety
+
+- Every setting change is allowlisted, report-bound, time-limited, compare-and-set, verified, and reversible from exact prior values.
+- UAC cancellation, partial failure, policy/concurrent changes, stale receipts, and repeated rollback remain explicit outcomes. The app never reboots automatically.
+
+## 3.0.0-beta.2 - 2026-08-03
+
+### Added
+
+- Product-wide **PC Crash Diagnostic** identity and `PCCrashDiagnostic.exe` executable.
+- General incident selection for blue screens, unexpected restarts, application failures, and monitored application exits, with Battlefield 6 retained as a preset.
+- Report schema version 3 with target profiles, incident fingerprints, source coverage, normalized bugchecks, crash-readiness facts, dump inventory/correlation, and privacy-filtered driver inventory.
+- Shared WHEA event catalog and bounded decoder that leaves unknown event IDs unclassified.
+- Safe dump recognition using no more than 32 header bytes; standard reports still exclude dump contents.
+- Included one-shot `PCCrashDiagnostic.ElevatedHelper.exe` for UAC-approved collection of bounded, privacy-filtered records or dump metadata from fixed Windows evidence sources, and private staging of one selected dump from approved Windows dump roots.
+- Version 3 release/source/report/dump prefixes, release-manifest identity checks, and a new `PCCrashDiagnostic.sln` entry point.
+
+### Changed
+
+- Version 3 uses `%LocalAppData%\PCCrashDiagnostic` and a v3-specific single-instance boundary.
+- The start, collection, result, and export workflow now distinguishes evidence, possible relevance, uncertainty, unavailable sources, and next checks.
+- Release trust text now labels the normal build `UNSIGNED BETA`. A signature is trusted only through the explicit pinned-thumbprint and timestamp gate.
+- The runtime manifest records the included elevated helper's exact filename, hash, and raw Authenticode status. The helper accepts one expiring request ID, performs one fixed operation, and exits.
+
+### Compatibility
+
+- Existing version 2 data and `BF6-Diagnostic-Report-*.zip` archives are not renamed, overwritten, or deleted.
+- Version 2 report writing and legacy self-signal recognition remain available for compatibility while version 3 outputs use the new identity.
+
+### Safety
+
+- The main app remains local-processing, read-only outside its own/export folders, `asInvoker`, non-injecting, and anti-cheat-safe. It has no uploads, telemetry, update checks, or automatic network requests; only an explicitly approved WinDbg retry can download Microsoft public symbols.
+- Protected helper operations are blocked while `BF6.exe` is running; dump staging rechecks during copying and removes partial data if BF6 starts, the request is cancelled, or validation fails.
+- The helper cannot run arbitrary commands or debuggers, accept arbitrary paths, install persistence, alter Windows settings, access the network, inspect a target process, or interact with anti-cheat.
+- Driver inventory omits device IDs, hardware IDs, serials, locations, and user names.
+- Original dump paths used for local correlation are excluded from JSON exports.
+- Optional WinDbg standard output and standard error are each retained up to 8,388,608 characters; excess output is drained and discarded, truncation is disclosed, and the bounded local log remains outside report exports.
+- The controlled beta remains unsigned and checksummed; same-bundle checksums are explicitly distinguished from independent publisher authentication.
+- Broad public distribution remains gated on Authenticode signatures and timestamps for both executables plus security validation of the final package in a fresh disposable Windows VM.
+
+## 2.0.0-beta.1 - 2026-08-02
+
+### Added
+
+- Native .NET 10 WPF interface with **Analyze latest crash** and **Monitor next BF6 session** workflows.
+- Retrospective crash-window analysis and ranked, plain-language findings.
+- Live system/BF6 memory and GPU-memory sampling with local report generation.
+- Grouped ETW provider-traits diagnostics, including an accurate `0xC0000001` explanation.
+- Local-only, review-before-sharing exports with report schema version 2.
+- Plain-language `00-START-HERE.txt` instructions in the Windows and source packages.
+- Explicit, separate opt-in path for packaging an existing Windows crash dump.
+- Reproducible build/verification scripts, release manifests, source/runtime packages, and SHA-256 checksums.
+
+### Safety
+
+- No elevation, installer, persistence, driver, process-memory inspection, anti-cheat interaction, network access, telemetry, or automatic upload.
+- Release verification is static and non-executing by default; packaged smoke execution now requires explicit opt-in.
+- Public packages require `Release` plus a completed test run, contain an explicitly allowlisted source tree, and reject sensitive/configuration/report/dump material.
+- Runtime packages now include authoritative .NET 10.0.10 runtime, WPF, .NET Library, and Windows SDK license/notice files.
+- Release documentation now distinguishes same-bundle checksum consistency from publisher authentication and uses Microsoft's current .NET 10 Windows support table.
+- The optional signature gate now pins the expected signer thumbprint, requires a timestamp certificate, and records signer/timestamp identity in both manifests.
