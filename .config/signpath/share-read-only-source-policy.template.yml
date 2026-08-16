@@ -1,0 +1,7 @@
+# Copy this file to .signpath/policies/<project-slug>/<policy-slug>.yml only
+# after the real SignPath slugs and repository ownership are configured.
+github-policies:
+  runners:
+    require_github_hosted: true
+  build:
+    disallow_reruns: true

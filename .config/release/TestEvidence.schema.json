@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pc-crash-diagnostic.invalid/schemas/test-evidence-v1.json",
+  "title": "PC Crash Diagnostic sanitized test evidence",
+  "type": "object",
+  "required": [
+    "SchemaVersion",
+    "Product",
+    "Version",
+    "FeatureProfile",
+    "GeneratedUtc",
+    "SourceCommit",
+    "SourceTreeState",
+    "TestResults",
+    "SafetyBoundaryPassed",
+    "PackagedSmokePassed",
+    "ReleaseAudits",
+    "RawTrx",
+    "Privacy"
+  ],
+  "properties": {
+    "SchemaVersion": { "const": 1 },
+    "Product": { "const": "PC Crash Diagnostic" },
+    "Version": { "const": "3.2.0-beta.1" },
+    "FeatureProfile": { "enum": ["ShareReadOnly", "FullDiagnostic", "WerResearch"] },
+    "GeneratedUtc": { "type": "string", "format": "date-time" },
+    "SourceCommit": { "type": ["string", "null"], "pattern": "^[0-9a-f]{40}$" },
+    "SourceTreeState": { "enum": ["clean", "dirty", "unknown"] },
+    "TestResults": {
+      "type": "object",
+      "required": ["Total", "Executed", "Passed", "Failed", "Errors", "Timeouts", "Aborted", "Inconclusive", "Skipped"],
+      "properties": {
+        "Total": { "type": "integer", "minimum": 1 },
+        "Executed": { "type": "integer", "minimum": 0 },
+        "Passed": { "type": "integer", "minimum": 1 },
+        "Failed": { "const": 0 },
+        "Errors": { "const": 0 },
+        "Timeouts": { "const": 0 },
+        "Aborted": { "const": 0 },
+        "Inconclusive": { "type": "integer", "minimum": 0 },
+        "Skipped": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "SafetyBoundaryPassed": { "const": true },
+    "PackagedSmokePassed": { "const": true },
+    "ReleaseAudits": {
+      "type": "object",
+      "required": ["DependencyVulnerabilityAuditPassed", "PublicIlAndResourceAuditPassed", "AssemblyCount", "AssemblyReferenceCount", "TypeReferenceCount", "ManifestResourceCount", "PublishedExecutableCount", "ForbiddenFindingCount"],
+      "properties": {
+        "DependencyVulnerabilityAuditPassed": { "const": true },
+        "PublicIlAndResourceAuditPassed": { "const": true },
+        "AssemblyCount": { "const": 4 },
+        "AssemblyReferenceCount": { "type": "integer", "minimum": 1 },
+        "TypeReferenceCount": { "type": "integer", "minimum": 1 },
+        "ManifestResourceCount": { "type": "integer", "minimum": 0 },
+        "PublishedExecutableCount": { "const": 1 },
+        "ForbiddenFindingCount": { "const": 0 }
+      },
+      "additionalProperties": false
+    },
+    "RawTrx": {
+      "type": "object",
+      "required": ["PubliclyPackaged", "FileName", "Sha256"],
+      "properties": {
+        "PubliclyPackaged": { "const": false },
+        "FileName": { "type": "string", "pattern": "^[^/\\\\]+\\.trx$" },
+        "Sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      },
+      "additionalProperties": false
+    },
+    "Privacy": { "type": "string", "minLength": 1 }
+  },
+  "additionalProperties": false
+}

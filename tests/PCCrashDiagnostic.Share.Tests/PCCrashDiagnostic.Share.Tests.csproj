@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <Platforms>AnyCPU;x64</Platforms>
+    <AssemblyName>PCCrashDiagnostic.Share.Tests</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.8.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\PCCrashDiagnostic.Core\PCCrashDiagnostic.Core.csproj" />
+    <ProjectReference Include="..\..\src\PCCrashDiagnostic.LocalTools\PCCrashDiagnostic.LocalTools.csproj" />
+    <ProjectReference Include="..\..\src\PCCrashDiagnostic.App\PCCrashDiagnostic.App.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- These privacy and deletion tests compile against the actual public Core
+         assembly as well as the internal regression assembly. Keeping them in
+         both suites prevents the project split from weakening the tested share
+         boundary. -->
+    <Compile Include="..\BF6CrashDiagnostic.Tests\TestDirectory.cs" Link="SharedTests\TestDirectory.cs" />
+    <Compile Include="..\BF6CrashDiagnostic.Tests\SafeSummaryTestData.cs" Link="SharedTests\SafeSummaryTestData.cs" />
+    <Compile Include="..\BF6CrashDiagnostic.Tests\SafeSummaryPrivacyTests.cs" Link="SharedTests\SafeSummaryPrivacyTests.cs" />
+    <Compile Include="..\BF6CrashDiagnostic.Tests\SafeSummaryServiceTests.cs" Link="SharedTests\SafeSummaryServiceTests.cs" />
+    <Compile Include="..\BF6CrashDiagnostic.Tests\ReportHandleRegistryTests.cs" Link="SharedTests\ReportHandleRegistryTests.cs" />
+    <Compile Include="..\BF6CrashDiagnostic.Tests\RecycleBinDeletionServiceTests.cs" Link="SharedTests\RecycleBinDeletionServiceTests.cs" />
+    <Compile Include="..\BF6CrashDiagnostic.Tests\TechnicalReportExportValidatorTests.cs" Link="SharedTests\TechnicalReportExportValidatorTests.cs" />
+  </ItemGroup>
+  <Target Name="ValidateShareReadOnlyTestProfile" BeforeTargets="PrepareForBuild">
+    <Error Condition="'$(PCCrashDiagnosticFeatureProfile)' != 'ShareReadOnly'"
+           Text="PCCrashDiagnostic.Share.Tests must be compiled only as ShareReadOnly." />
+  </Target>
+</Project>

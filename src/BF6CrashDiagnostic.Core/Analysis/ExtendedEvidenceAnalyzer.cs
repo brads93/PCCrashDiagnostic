@@ -8,6 +8,14 @@ namespace BF6CrashDiagnostic.Core.Analysis;
 /// </summary>
 public sealed class ExtendedEvidenceAnalyzer
 {
+#if PCD_SHARE_READ_ONLY
+    private const string InaccessibleDumpNextCheck =
+        "This read-only build cannot bypass file permissions. Use a dump Windows already allows your account to read.";
+#else
+    private const string InaccessibleDumpNextCheck =
+        "Select the dump and retry the protected evidence operation with UAC if you want it inspected locally.";
+#endif
+
     public IReadOnlyList<DiagnosticFinding> Analyze(
         DumpQuality? dumpQuality,
         RecentChangeTimeline? recentChanges,
@@ -57,7 +65,7 @@ public sealed class ExtendedEvidenceAnalyzer
                     FindingConfidence.Medium,
                     "Crash dump access was denied",
                     "A potentially relevant dump exists, but this collection could not validate it.",
-                    "Select the dump and retry the protected evidence operation with UAC if you want it inspected locally."),
+                    InaccessibleDumpNextCheck),
                 _ => (
                     FindingSeverity.Context,
                     FindingConfidence.Low,

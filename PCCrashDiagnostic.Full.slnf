@@ -1,0 +1,12 @@
+{
+  "solution": {
+    "path": "PCCrashDiagnostic.sln",
+    "projects": [
+      "src/PCCrashDiagnostic.Contracts/PCCrashDiagnostic.Contracts.csproj",
+      "src/PCCrashDiagnostic.Privileged/PCCrashDiagnostic.Privileged.csproj",
+      "src/PCCrashDiagnostic.ElevatedHelper/PCCrashDiagnostic.ElevatedHelper.csproj",
+      "src/BF6CrashDiagnostic.App/PCCrashDiagnostic.Advanced.App.csproj",
+      "tests/BF6CrashDiagnostic.Tests/BF6CrashDiagnostic.Tests.csproj"
+    ]
+  }
+}

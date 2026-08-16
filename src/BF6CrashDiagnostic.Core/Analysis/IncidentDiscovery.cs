@@ -81,7 +81,8 @@ public sealed partial class IncidentDiscovery
                 primary.Priority,
                 supporting.Length + 1,
                 times.Min(),
-                times.Max()));
+                times.Max(),
+                primary.EvidenceOrigin));
         }
 
         return candidates
@@ -211,7 +212,8 @@ public sealed partial class IncidentDiscovery
                 targetProfile?.Id,
                 null,
                 null,
-                950);
+                950,
+                IncidentEvidenceOrigin.ReliabilityMonitor);
             return true;
         }
 
@@ -226,7 +228,8 @@ public sealed partial class IncidentDiscovery
                 targetProfile?.Id,
                 null,
                 null,
-                725);
+                725,
+                IncidentEvidenceOrigin.ReliabilityMonitor);
             return true;
         }
 
@@ -242,7 +245,8 @@ public sealed partial class IncidentDiscovery
                 targetProfile?.Id,
                 null,
                 null,
-                700);
+                700,
+                IncidentEvidenceOrigin.ReliabilityMonitor);
             return true;
         }
 
@@ -257,7 +261,8 @@ public sealed partial class IncidentDiscovery
                 targetProfile.Id,
                 null,
                 null,
-                575);
+                575,
+                IncidentEvidenceOrigin.ReliabilityMonitor);
             return true;
         }
 
@@ -345,5 +350,6 @@ public sealed partial class IncidentDiscovery
         string? TargetProfileId,
         string? BugcheckCode,
         string? DumpFileName,
-        int Priority);
+        int Priority,
+        IncidentEvidenceOrigin EvidenceOrigin = IncidentEvidenceOrigin.WindowsEventLog);
 }

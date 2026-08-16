@@ -7,6 +7,30 @@ namespace BF6CrashDiagnostic.Tests;
 public sealed class CoordinatorSecurityBoundaryTests
 {
     [Fact]
+    public void DumpInspection_WithNullTargetFailsClosedForProtectedAlias()
+    {
+        using var directory = new TestDirectory();
+        using var coordinator = new PCCrashDiagnosticCoordinator(
+            directory.Path,
+            static (_, _) => Task.CompletedTask,
+            elevatedHelperClient: null,
+            protectedEvidenceHelper: null,
+            helperRequestStore: null,
+            isBf6RunningFailClosed: static () => false,
+            protectedDumpPathValidator: null,
+            isProtectedProcessRunning: processName =>
+                processName.Equals("EAAntiCheat.GameService", StringComparison.OrdinalIgnoreCase));
+
+        InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() =>
+            coordinator.InspectSelectedDump(
+                Path.Combine(directory.Path, "not-read.dmp"),
+                DumpKind.WindowsMinidump,
+                "Synthetic dump"));
+
+        Assert.Contains("EA AntiCheat", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task DumpInventory_DiscardsInspectedCandidatesWhenProtectedTargetStartsMidEnumeration()
     {
         using var directory = new TestDirectory();

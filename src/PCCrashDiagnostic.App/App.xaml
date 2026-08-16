@@ -1,0 +1,27 @@
+<Application x:Class="PCCrashDiagnostic.App.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Application.Resources>
+    <SolidColorBrush x:Key="PageBrush" Color="#0B121C" />
+    <SolidColorBrush x:Key="PanelBrush" Color="#121D2B" />
+    <SolidColorBrush x:Key="PanelBorderBrush" Color="#294056" />
+    <SolidColorBrush x:Key="PrimaryBrush" Color="#39B7F1" />
+    <SolidColorBrush x:Key="TextBrush" Color="#F3F7FB" />
+    <SolidColorBrush x:Key="MutedBrush" Color="#AFC2D7" />
+    <Style TargetType="Window">
+      <Setter Property="Background" Value="{StaticResource PageBrush}" />
+      <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+      <Setter Property="FontFamily" Value="Segoe UI" />
+      <Setter Property="FontSize" Value="15" />
+    </Style>
+    <Style TargetType="TextBlock">
+      <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+    </Style>
+    <Style TargetType="Button">
+      <Setter Property="Padding" Value="18,12" />
+      <Setter Property="Margin" Value="0,6,0,6" />
+      <Setter Property="MinHeight" Value="44" />
+      <Setter Property="HorizontalContentAlignment" Value="Left" />
+    </Style>
+  </Application.Resources>
+</Application>

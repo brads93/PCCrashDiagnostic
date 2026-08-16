@@ -31,6 +31,18 @@ internal interface IBoundedCommandRunner
 /// </summary>
 internal sealed class BoundedCommandRunner : IBoundedCommandRunner
 {
+    private readonly Action<KillOnCloseJob, Process> _assignToJob;
+
+    public BoundedCommandRunner()
+        : this(static (job, process) => job.Assign(process))
+    {
+    }
+
+    internal BoundedCommandRunner(Action<KillOnCloseJob, Process> assignToJob)
+    {
+        _assignToJob = assignToJob ?? throw new ArgumentNullException(nameof(assignToJob));
+    }
+
     public async Task<BoundedCommandResult> RunAsync(
         BoundedCommandRequest request,
         CancellationToken cancellationToken)
@@ -64,8 +76,18 @@ internal sealed class BoundedCommandRunner : IBoundedCommandRunner
             throw new InvalidOperationException("The diagnostic command did not start.");
         }
 
+        try
+        {
+            _assignToJob(job, process);
+        }
+        catch
+        {
+            TryKill(process);
+            await WaitForForcedExitAsync(process).ConfigureAwait(false);
+            throw;
+        }
+
         process.StandardInput.Close();
-        job.Assign(process);
 
         Task<BoundedTextReadResult> outputTask = BoundedTextStreamReader.ReadAndDrainAsync(
             process.StandardOutput,
@@ -101,6 +123,32 @@ internal sealed class BoundedCommandRunner : IBoundedCommandRunner
             timedOut,
             cancelled,
             output.Truncated || error.Truncated);
+    }
+
+    private static async Task WaitForForcedExitAsync(Process process)
+    {
+        try
+        {
+            if (process.HasExited)
+            {
+                return;
+            }
+
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            await process.WaitForExitAsync(timeout.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            // Preserve the original containment failure after a bounded cleanup attempt.
+        }
+        catch (InvalidOperationException)
+        {
+            // The child exited before its state could be observed.
+        }
+        catch (System.ComponentModel.Win32Exception)
+        {
+            // Preserve the original containment failure after best-effort cleanup.
+        }
     }
 
     private static void TryKill(Process process)

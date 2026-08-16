@@ -9,7 +9,12 @@ namespace BF6CrashDiagnostic.Core.Collectors;
 /// Inspects only the fixed-format header bytes needed to identify a Windows dump container.
 /// It never parses streams, memory pages, strings, modules, or stack data.
 /// </summary>
-public sealed class SafeDumpInspector
+#if PCD_SHARE_READ_ONLY
+internal
+#else
+public
+#endif
+sealed class SafeDumpInspector
 {
     public const int MaximumHeaderBytesRead = 32;
 

@@ -142,7 +142,9 @@ public sealed class ReportWriter
             report.IncidentSelection,
             report.TargetProfile,
             report.IncidentFingerprint,
-            report.CrashCorrelation
+            report.CrashCorrelation,
+            report.BootSession,
+            report.WheaEvidence
         }, cancellationToken).ConfigureAwait(false);
         await WriteJsonAsync(sessionFolder, Path.Combine(sessionFolder, "Bugchecks.json"), report.Bugchecks, cancellationToken).ConfigureAwait(false);
         await WriteJsonAsync(sessionFolder, Path.Combine(sessionFolder, "Crash-Readiness.json"), report.CrashReadiness, cancellationToken).ConfigureAwait(false);

@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <AssemblyName>PCCrashDiagnostic.Privileged</AssemblyName>
+    <RootNamespace>BF6CrashDiagnostic.Core</RootNamespace>
+    <Platforms>AnyCPU;x64</Platforms>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="System.Diagnostics.PerformanceCounter" Version="10.0.11" />
+    <PackageReference Include="System.Management" Version="10.0.11" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\PCCrashDiagnostic.Contracts\PCCrashDiagnostic.Contracts.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\BF6CrashDiagnostic.Core\**\*.cs"
+             Exclude="..\BF6CrashDiagnostic.Core\bin\**\*.cs;..\BF6CrashDiagnostic.Core\obj\**\*.cs"
+             Link="%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="BF6CrashDiagnostic.Tests" />
+  </ItemGroup>
+  <Target Name="ValidateInternalPrivilegedProfile" BeforeTargets="PrepareForBuild">
+    <Error Condition="'$(PCCrashDiagnosticFeatureProfile)' != 'FullDiagnostic' and '$(PCCrashDiagnosticFeatureProfile)' != 'WerResearch'"
+           Text="PCCrashDiagnostic.Privileged is internal-only and requires FullDiagnostic or WerResearch." />
+  </Target>
+</Project>

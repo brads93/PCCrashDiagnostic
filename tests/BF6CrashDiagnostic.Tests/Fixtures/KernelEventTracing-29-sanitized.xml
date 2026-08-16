@@ -1,0 +1,13 @@
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+  <System>
+    <Provider Name="Microsoft-Windows-Kernel-EventTracing" Guid="{B675EC37-BDB6-4648-BC92-F3FDC74D3CA2}" />
+    <EventID>29</EventID>
+    <Level>2</Level>
+    <TimeCreated SystemTime="2026-08-02T04:42:18.0000000Z" />
+    <Channel>Microsoft-Windows-Kernel-EventTracing/Admin</Channel>
+  </System>
+  <EventData>
+    <Data Name="ProviderGuid">{8444A4FB-D8D3-4F38-84F8-89960A1EF12F}</Data>
+    <Data Name="ErrorCode">3221225473</Data>
+  </EventData>
+</Event>

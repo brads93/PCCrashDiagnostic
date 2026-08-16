@@ -19,7 +19,7 @@ public sealed partial class WindowsEventCollector
 {
     private const string SystemLog = "System";
     private const string ApplicationLog = "Application";
-    private const string KernelEventTracingLog = "Microsoft-Windows-Kernel-EventTracing/Admin";
+    private const string KernelEventTracingLog = KernelEventTracingCatalog.AdminLogName;
     private const int DefaultMaxEventsPerLog = 1_500;
 
     private static readonly TimeSpan DefaultAnchorLookback = TimeSpan.FromDays(14);
@@ -29,12 +29,12 @@ public sealed partial class WindowsEventCollector
     // Provider and event-ID pairs are intentionally explicit. Do not replace these with a
     // provider-only query: several of these publishers also emit high-volume operational data.
     private static readonly (string Provider, int[] EventIds)[] StorageEvidenceSignals =
-    [
-        ("disk", [7, 11, 51, 153]),
-        ("storahci", [129]),
-        ("stornvme", [129]),
-        ("Microsoft-Windows-StorPort", [129])
-    ];
+        StorageEventCatalog.Signals
+            .GroupBy(signal => signal.ProviderName, StringComparer.OrdinalIgnoreCase)
+            .Select(group => (
+                group.Key,
+                group.SelectMany(signal => signal.EventIds).Distinct().Order().ToArray()))
+            .ToArray();
 
     private static readonly (string Provider, int[] EventIds)[] FileSystemEvidenceSignals =
     [
@@ -166,6 +166,47 @@ public sealed partial class WindowsEventCollector
     }
 
     /// <summary>
+    /// Reads a narrow history of boot-boundary markers around an incident so a
+    /// historical report does not assume the machine's current boot session.
+    /// </summary>
+    internal Task<WindowsEventCollection> CollectBootMarkersAsync(
+        DateTimeOffset incidentTimeUtc,
+        CancellationToken cancellationToken = default)
+    {
+        DateTimeOffset incident = incidentTimeUtc.ToUniversalTime();
+        DateTimeOffset startUtc = incident.AddDays(-31);
+        DateTimeOffset endUtc = _timeProvider.GetUtcNow().ToUniversalTime().AddMinutes(5);
+        if (endUtc <= incident)
+        {
+            endUtc = incident.AddMinutes(5);
+        }
+
+        var specification = new LogSpecification(
+            SystemLog,
+            "Windows Event Log/System boot markers",
+            BuildBootMarkerXPath(startUtc, endUtc));
+        return Task.Run(() =>
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            LogReadResult result = ReadLog(specification, cancellationToken);
+            DiagnosticEvent[] events = result.Events
+                .Where(BootSessionReconstructor.IsBootMarker)
+                .OrderBy(item => item.TimeUtc)
+                .ThenBy(item => item.ProviderName, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(item => item.EventId)
+                .ToArray();
+            return new WindowsEventCollection(
+                null,
+                startUtc,
+                endUtc,
+                events,
+                new EventAnalyzer().GroupDuplicates(events),
+                [result.Status]);
+        }, cancellationToken);
+    }
+
+#if !PCD_SHARE_READ_ONLY
+    /// <summary>
     /// Reads exactly one allowlisted event-log source for the elevated retry
     /// protocol. The returned model contains parsed, whitelisted fields rather
     /// than raw event XML or an EVTX export.
@@ -253,6 +294,7 @@ public sealed partial class WindowsEventCollector
                item.ProviderName.Equals("amdkmdag", StringComparison.OrdinalIgnoreCase) ||
                item.ProviderName.Equals("Microsoft-Windows-DxgKrnl", StringComparison.OrdinalIgnoreCase);
     }
+#endif
 
     private static bool IsProviderEventSignal(
         IEnumerable<(string Provider, int[] EventIds)> signals,
@@ -592,7 +634,18 @@ public sealed partial class WindowsEventCollector
         yield return new LogSpecification(
             KernelEventTracingLog,
             "Windows Event Log/Kernel-EventTracing Admin",
-            $"*[System[{time} and (EventID=2 or EventID=3 or EventID=4 or EventID=28)]]");
+            $"*[System[{time} and ({EventIdPredicate(KernelEventTracingCatalog.EvidenceEventIds)})]]");
+    }
+
+    internal static string BuildBootMarkerXPath(DateTimeOffset startUtc, DateTimeOffset endUtc)
+    {
+        ValidateWindow(startUtc, endUtc);
+        string time = TimePredicate(startUtc, endUtc);
+        return $"*[System[{time} and (" +
+               "(Provider[@Name='Microsoft-Windows-Kernel-General'] and (EventID=12 or EventID=13)) or " +
+               "(Provider[@Name='EventLog'] and (EventID=6005 or EventID=6006 or EventID=6008)) or " +
+               "(Provider[@Name='Microsoft-Windows-Kernel-Power'] and EventID=41)" +
+               ")]]";
     }
 
     internal static string BuildEvidenceSystemXPath(DateTimeOffset startUtc, DateTimeOffset endUtc)
@@ -777,8 +830,8 @@ public sealed partial class WindowsEventCollector
         IReadOnlyDictionary<string, string> data,
         string? renderedMessage)
     {
-        if (providerName.Contains("Kernel-EventTracing", StringComparison.OrdinalIgnoreCase) &&
-            eventId == 28 &&
+        if (KernelEventTracingCatalog.IsProvider(providerName) &&
+            KernelEventTracingCatalog.IsProviderTraitsEvent(eventId) &&
             providerGuid is not null &&
             TryGetValue(data, "ErrorCode", out string? errorCode) &&
             !string.IsNullOrWhiteSpace(errorCode))

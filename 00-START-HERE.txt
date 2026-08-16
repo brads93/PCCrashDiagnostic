@@ -1,63 +1,60 @@
-PC CRASH DIAGNOSTIC - START HERE
+PC CRASH DIAGNOSTIC 3.2 - START HERE
 
-This is a portable app. Nothing is installed.
+This is the ShareReadOnly portable build. Nothing is installed. It contains
+one app, PCCrashDiagnostic.exe, and does not ask for administrator access or
+change Windows crash settings.
 
-This controlled beta is not digitally signed. The settings-changing build is
-for developer and controlled VM testing until both executables are signed and
-the final release passes its Windows VM security checks.
+ONLY RUN AN APPROVED, SIGNED RELEASE
+
+Do not run a developer candidate sent as a loose Discord attachment. A shared
+release should identify its publisher in the Digital Signatures tab and should
+not show Unknown publisher. If Windows asks for administrator permission, click
+No: the ShareReadOnly build never needs UAC.
 
 1. EXTRACT THE ZIP
 
 Right-click the runtime ZIP, choose Extract All, and open the extracted folder.
 Do not run the app from inside the ZIP preview.
 
-2. SCAN THE EXTRACTED FOLDER
+2. CHECK AND SCAN IT
 
-Right-click the folder or PCCrashDiagnostic.exe, choose Show more options if
-needed, then choose Scan with Microsoft Defender. Do not disable Defender,
-SmartScreen, UAC, anti-cheat, or another security feature for this app.
+Right-click PCCrashDiagnostic.exe, choose Properties, and check the Digital
+Signatures tab. An approved open-source release is expected to show a valid
+SignPath Foundation publisher signature, matching the official release page.
+Then right-click the extracted folder or EXE and choose Scan with
+Microsoft Defender (Show more options may be required).
+
+Do not disable Defender, SmartScreen, UAC, anti-cheat, or another security
+feature for this app. You do not need to compare a hash manually.
 
 3. RUN THE APP
 
-Double-click PCCrashDiagnostic.exe. The main app uses your normal Windows
-account and does not ask for administrator access at startup.
+Double-click PCCrashDiagnostic.exe. Choose the closest match:
 
-4. CHOOSE WHAT HAPPENED
+- Windows restarted or showed a blue screen
+- An app or game closed or froze
+- Monitor an app for the next problem
+- Open a previous report
 
-- For a blue screen or restart, choose Windows restarted or showed a blue
-  screen, select the incident, then analyze it.
-- For an app or game crash, choose An app or game closed or froze and select
-  the app.
-- To watch the next session, choose Monitor an app for the next problem.
+The app reads Windows diagnostic evidence available to your account. It does
+not control the selected program, send mouse or keyboard input, inject code,
+read process memory, or interact with anti-cheat.
 
-The app does not control the selected program or send mouse or keyboard input.
+4. REVIEW THE RESULT
 
-5. OPTIONAL: PREPARE FOR THE NEXT CRASH
+Read Evidence collected, Crash capture readiness, and Source coverage. A named
+driver or hardware category is not proof that part caused the crash. The app
+may correctly report that no cause was identified in the Windows records it
+could read.
 
-Prepare this PC for the next crash first shows every proposed setting. Continue
-only if those changes are acceptable. Windows then asks to run exactly
-PCCrashDiagnostic.ElevatedHelper.exe. The helper makes the shown changes,
-checks them, saves the previous values, and exits. Windows is never restarted
-automatically.
+5. SHARE THE SAFE SUMMARY FIRST
 
-After a restart, the Start screen keeps an option to restore the earlier
-settings. Restore asks for UAC again and will not overwrite settings changed by
-another program or policy.
+Choose Review safe summary. Read the exact text, then copy or save it if you are
+comfortable sharing it. This is the best first item to send to a Discord helper.
 
-Distributable beta.2 packages do not enable new Advanced app dumps. That
-experimental WER path remains source-only for disposable-VM research because
-Windows keys it by executable name. If this app finds a saved receipt from an
-earlier developer build, it still offers to restore the earlier settings.
+The advanced technical report contains more machine detail. Export it only
+after reading the warning, and inspect the ZIP before sharing. The standard
+technical report does not contain crash-dump bytes or raw debugger logs.
 
-Close Battlefield 6 before any helper, dump, or debugger operation.
-
-6. REVIEW AND EXPORT
-
-When the report is ready, choose Review and export. The normal report does not
-contain crash-dump bytes or raw debugger output. A dump ZIP is always a
-separate, explicit action with its own privacy warning.
-
-The app checks its helper automatically. There is no manual hash step in the
-app. Developer release folders still contain SHA256SUMS.txt and source code for
-optional independent verification; a hash confirms file integrity, not who
-published the file.
+Reports stay on this PC until you export them. Local history can be moved to the
+Recycle Bin from the app; that is recoverable deletion, not secure erasure.

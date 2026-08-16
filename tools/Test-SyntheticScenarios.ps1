@@ -32,6 +32,9 @@ try {
     & $resolvedDotNet test $testProject `
         -c $Configuration `
         --no-restore `
+        -p:PCCrashDiagnosticFeatureProfile=FullDiagnostic `
+        -p:PCCrashDiagnosticWerLocalDumpCapture=Disabled `
+        -p:PCCrashDiagnosticRuntimeVersion=10.0.11 `
         --filter 'Category=SyntheticScenario' `
         --nologo `
         --verbosity normal

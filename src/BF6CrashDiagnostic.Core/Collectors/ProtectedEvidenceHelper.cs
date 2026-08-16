@@ -1652,12 +1652,11 @@ public sealed class ProtectedEvidenceHelper
             return true;
         }
 
-        string[] protectedNames = ["BF6", "EAAntiCheat", "Javelin"];
         IEnumerable<string> names = target.ProcessNames
             .Concat(target.RelatedProcessNames)
             .Append(executableName);
-        return names.Any(name => protectedNames.Contains(
-                   Path.GetFileNameWithoutExtension(name),
+        return names.Any(name => ProtectedProcessGuard.AlwaysProtectedProcessNames.Contains(
+                   ProtectedProcessGuard.NormalizeProcessName(name),
                    StringComparer.OrdinalIgnoreCase)) ||
                target.ApplicationEventSignals.Any(signal =>
                    signal.Contains("anti-cheat", StringComparison.OrdinalIgnoreCase) ||

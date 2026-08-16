@@ -1,140 +1,181 @@
 # PC Crash Diagnostic
 
-PC Crash Diagnostic is a portable, open-source Windows app for collecting evidence around blue screens, unexpected restarts, application crashes and hangs, and display-driver resets. Battlefield 6 is included as a monitoring preset, but the app is designed for general Windows crash diagnosis.
+PC Crash Diagnostic is a portable, open-source Windows app that collects local
+evidence around blue screens, unexpected restarts, application crashes or
+hangs, and display-driver resets. Battlefield 6 is included as a monitoring
+preset, but the app is for general Windows crash triage.
 
-Everything is processed locally. There is no telemetry, upload, updater, automatic repair, stress test, or automatic driver or BIOS change. A report explains what Windows recorded, what could be relevant, what the evidence does not prove, and what to check next.
+The app reports what Windows recorded, possible relevance, limitations, and a
+next check. It does not claim that one event, driver name, or hardware category
+proves a root cause.
 
-This project is unofficial and is not affiliated with or endorsed by Electronic Arts, Battlefield Studios, AMD, Microsoft, or their affiliates.
+This project is unofficial and is not affiliated with or endorsed by
+Electronic Arts, Battlefield Studios, Microsoft, AMD, NVIDIA, or their
+affiliates.
 
-## Version 3.1 staged betas
+## 3.2.0-beta.1: ShareReadOnly
 
-The v3.1 work is released in two stages from the same source tree:
+Version `3.2.0-beta.1` introduces a compile-time `ShareReadOnly` profile for the
+friend-facing app. This is a separate application graph, not the earlier
+settings-changing UI with buttons hidden.
 
-| Release | Included |
-| --- | --- |
-| `3.1.0-beta.1` | Corrected crash-readiness checks, the **Prepare this PC for the next crash** workflow, one UAC prompt, verification, restart status, and rollback. |
-| `3.1.0-beta.2` | Everything in beta.1, plus dump-quality checks, recent update/driver timing, storage health, Driver Verifier detection, and WinDbg boot/service black-box summaries. The per-app WER implementation remains source-only behind an explicit developer gate. |
+The ShareReadOnly package:
 
-Both are controlled unsigned builds. Because the elevated helper can change the specific crash-capture settings shown in a preview, these builds are for developer and controlled VM testing until both executables are Authenticode-signed and the final bytes pass the disposable-VM security plan. They are not cleared for broad public or friend-to-friend distribution.
+- contains one executable, `PCCrashDiagnostic.exe`;
+- runs as the signed-in standard user and never asks for UAC;
+- cannot launch an elevated helper, change or restore Windows settings,
+  configure WER LocalDumps, stage protected dumps, or package dump bytes;
+- makes no telemetry, upload, updater, or automatic repair request;
+- keeps reports local until the user exports them; and
+- offers a reviewed safe summary before the advanced technical report.
+
+The release infrastructure currently creates candidates. Do not send a build
+to a friend until its manifest is explicitly approved after Authenticode,
+RFC 3161 timestamp, and exact-package disposable-VM gates. An unsigned or
+**signed awaiting VM** artifact is not a shareable release.
+
+See [Build profiles](docs/BUILD_PROFILES.md),
+[Code signing policy](CODE_SIGNING_POLICY.md), and
+[Release process](docs/RELEASE_PROCESS.md).
+
+Free code signing provided by SignPath.io, certificate by SignPath Foundation
+([SignPath.io](https://signpath.io/), [SignPath Foundation](https://signpath.org/)).
 
 ## Main workflows
 
-- **Windows restarted or showed a blue screen** — choose an incident, then collect bugcheck, WHEA, dump, driver, storage, and nearby Windows evidence.
-- **An app or game closed or froze** — choose an executable or running process and review matching Windows records.
-- **Monitor an app for the next problem** — monitor all matching instances without reading process memory, modules, command lines, input, or anti-cheat data.
-- **Open a previous report** — review a saved v3 report or import validated v2 reports into local history.
-- **Prepare this PC for the next crash** — preview a fixed Automatic Memory Dump configuration, approve one UAC prompt, verify the result, and retain a rollback receipt.
+- **Windows restarted or showed a blue screen** — search 24 hours, seven days,
+  14 days, or a custom period; choose an incident; then collect related Windows
+  evidence.
+- **An app or game closed or froze** — choose a target and inspect matching
+  application evidence.
+- **Monitor an app for the next problem** — observe all matching process
+  instances without reading their memory, modules, command lines, or input.
+- **Open a previous report** — validate and review a local report.
+- **Local report history** — reopen reports or move selected history to the
+  Windows Recycle Bin.
 
-A monitored process disappearing is recorded as **app closed**. The app waits for two missed samples and checks Windows evidence for up to 60 seconds before describing any crash or hang evidence.
-
-## Crash-capture preparation
-
-The recommended preset can set only these values:
-
-- Automatic Memory Dump;
-- `%SystemRoot%\MEMORY.DMP`;
-- crash-event logging enabled;
-- overwrite enabled; and
-- Windows-managed page-file sizing when the existing dump backing cannot be shown to be sufficient.
-
-It also clears `FilterPages` so Automatic Memory Dump is not accidentally treated as Active Memory Dump. It does not change automatic restart, `AlwaysKeepMemoryDump`, the minidump directory, or unrelated recovery settings, and it never restarts Windows automatically.
-
-Before UAC, the app shows every current and proposed value, expected disk/privacy effects, and whether a restart is needed. The one-shot helper compares the current values with that preview before writing, verifies every write, and saves the exact previous values in an ACL-restricted receipt. Restore uses another explicit UAC prompt and refuses to overwrite values changed later by another program or policy. A Start-screen restore notice remains available after relaunch or restart.
-
-This cannot improve a dump that already exists. It prepares Windows to capture better evidence from a future crash.
-
-## Per-application dumps: developer testing only
-
-Distributable beta.2 packages compile the WER LocalDumps apply path off. Windows stores this setting in `HKLM` by executable basename, so a later elevated or system process with the same basename could write private memory into the configured location. Signing does not remove that design risk. The normal UI can still restore a validated receipt created by an earlier developer build.
-
-The implementation remains available to explicit source builds for disposable-VM security research; it is not cleared for a daily-use PC or friend distribution.
-
-The Advanced per-app option creates a WER `LocalDumps` entry only for the selected ordinary executable. It never enables global LocalDumps. The fixed configuration uses full user-mode dumps, keeps at most two, and writes to a helper-derived ACL-restricted folder.
-
-The selected ordinary app must be running in the signed-in user session when setup is committed. Critical Windows processes, Battlefield 6, anti-cheat targets, and protected profiles are rejected by the helper. The app asks the user to confirm that a generic executable is not a protected game. Per-app capture can later be disabled and the exact earlier values restored.
-
-Full user-mode dumps can be large and may contain private process memory. Some programs with their own crash reporter may not honor WER LocalDumps. Because Windows keys this setting by executable name, disable capture before later running an executable with that same name as administrator.
+A monitored process disappearing is recorded as **app closed**, not
+automatically as a crash. The monitor waits for two missed samples and then
+polls Windows evidence for up to 60 seconds.
 
 ## Diagnostic coverage
 
-Standard collection includes:
+Depending on what Windows exposes to the standard user, collection can include:
 
-- normalized bugcheck codes and all four parameters from compatible Windows records;
-- WER 1001, Kernel-Power 41, EventLog 6008, dump timestamps, boot changes, and dump-write failures;
-- WHEA processor, memory, PCIe, and generic hardware categories from documented records, without declaring a component defective;
-- narrowly filtered storage, filesystem, Windows Memory Diagnostic, GPU reset, application error, and application hang evidence;
-- crash-readiness, configured and active page-file state, actual dump-volume capacity, and destination accessibility;
-- privacy-filtered driver/device context and read-only storage health when Windows exposes it;
-- a seven-day Windows Update and bounded SetupAPI driver-install timeline, shown as timing context rather than causation;
-- the current result of a timed `verifier /querysettings` query—the app never enables or resets Driver Verifier; and
-- bounded dump validation. User-mode `MDMP` structure is checked with documented APIs; kernel dumps receive signature/metadata checks unless a trusted Microsoft tool is available.
+- normalized bugcheck codes and parameters;
+- WER 1001, Kernel-Power 41, EventLog 6008, boot changes, and dump-write
+  evidence;
+- WHEA processor, memory, PCIe, and generic hardware categories without
+  declaring a component defective;
+- narrowly filtered storage, filesystem, Windows Memory Diagnostic, GPU reset,
+  application-error, and application-hang records;
+- dump inventory and bounded header recognition for accessible dump files;
+- privacy-filtered driver/device context;
+- recent Windows Update and bounded driver-install timing context;
+- Windows-reported storage health when available;
+- a read-only query of existing Driver Verifier settings; and
+- crash-capture readiness, including dump mode, page-file facts, destination
+  accessibility, and free-space estimates.
 
-When a Microsoft-signed x64 WinDbg or DumpChk installation is found, the app can run it locally, non-elevated, with fixed arguments and a timeout. WinDbg starts with local symbols. A Microsoft public-symbol retry happens only after explicit consent; the dump remains local. Exported debugger fields are labeled **WinDbg reported**, and a named module is never described as a confirmed faulty driver.
+The readiness card is read-only. This build cannot prepare the PC, improve an
+existing dump, or change how the next dump is captured.
 
-The ordinary report never includes dump bytes or raw debugger output.
+If a source is denied, unavailable, or times out, the report says so. The UI
+uses: **No cause was identified in the Windows records this app could read.**
 
-## Microsoft references
+## Results and sharing
 
-- [Windows memory-dump options](https://learn.microsoft.com/en-us/troubleshoot/windows-server/performance/memory-dump-file-options)
-- [Page-file requirements for crash dumps](https://learn.microsoft.com/en-us/troubleshoot/windows-client/performance/how-to-determine-the-appropriate-page-file-size-for-64-bit-versions-of-windows)
-- [WER per-application LocalDumps](https://learn.microsoft.com/en-us/windows/win32/wer/collecting-user-mode-dumps)
-- [DumpChk](https://learn.microsoft.com/en-us/windows-hardware/drivers/debugger/dumpchk)
-- [WinDbg `!blackboxbsd`](https://learn.microsoft.com/en-us/windows-hardware/drivers/debuggercmds/-blackboxbsd)
-- [Driver Verifier](https://learn.microsoft.com/en-us/windows-hardware/drivers/devtest/driver-verifier)
+Results distinguish the observation, evidence label, possible relevance,
+limitation, and next check. Source coverage stays visible so missing records are
+not mistaken for proof that nothing occurred.
+
+Use **Review safe summary** first. Copy and Save use the exact previewed bytes.
+The advanced technical report contains structured Windows evidence and more
+machine detail, so it requires a separate confirmation. Neither export contains
+crash-dump bytes or raw debugger logs.
+
+Read [Sharing results with a helper](docs/SUPPORT_SUMMARY.md) and
+[Privacy](PRIVACY.md) before sending a report.
 
 ## Battlefield 6 boundary
 
-The app does not inject into, hook, automate, or send input to Battlefield 6. It does not inspect process memory, modules, command lines, game files, or anti-cheat data.
+The app does not inject into, hook, automate, or send input to Battlefield 6.
+It does not inspect process memory, modules, command lines, game files, or
+anti-cheat data. Monitoring uses ordinary aggregate process counters exposed by
+Windows.
 
-While the BF6 preset detects BF6 running, the app blocks dump inspection, dump packaging, helper launch, and debugger launch. Long-running dump tools and copies are cancelled if BF6 starts, and partial private staging data is removed.
+## Local data
 
-## Local files and privacy
+Version 3 uses `%LocalAppData%\PCCrashDiagnostic` for reports, history, and
+session data. Version 2 data under `%LocalAppData%\UnofficialBF6Diagnostic` is
+left unchanged. The app has no cloud account or server-side copy.
 
-Version 3 uses `%LocalAppData%\PCCrashDiagnostic` for reports, history, symbols, sessions, and the one-use helper request/response channel. Administrator-owned receipts, WER dumps, and protected staging use `%ProgramData%\PCCrashDiagnostic\<originating user SID>` so a normal user cannot replace their security-sensitive parent folder. All of it remains on the PC. A custom `--data-root` changes only ordinary report/history/session storage; it cannot redirect elevated requests, receipts, WER dumps, or protected staging.
-
-Version 2 data under `%LocalAppData%\UnofficialBF6Diagnostic` is left unchanged. Validated v2 reports can be imported for history without rewriting the originals.
-
-Crash dumps can contain usernames, paths, chat, documents, credentials, encryption material, or other memory contents. Dump packaging is a separate explicit operation with a privacy warning. Read [PRIVACY.md](PRIVACY.md) before sharing anything.
-
-## Runtime files
-
-Extract the entire runtime ZIP before launching it. The main executable is `PCCrashDiagnostic.exe`; the separate `PCCrashDiagnostic.ElevatedHelper.exe` appears in UAC only after an explicit action that needs administrator access. The main app stays `asInvoker`; the helper handles one allowlisted request and exits. It is not installed as a service and creates no scheduled task, startup entry, driver, or updater.
-
-Each release directory contains:
-
-- `PCCrashDiagnostic-<version>-win-x64.zip`
-- `PCCrashDiagnostic-<version>-source.zip`
-- `ReleaseManifest.json`
-- `SHA256SUMS.txt`
-
-The main app automatically verifies the helper hash before requesting UAC. There is no manual hash step in the UI. Release checksums remain available for developers who want to verify that a package matches an independently obtained release value; a checksum by itself does not identify the publisher.
+Moving a report to the Recycle Bin is recoverable and is not secure erasure.
+Restored files may reappear in history.
 
 ## Build and test
 
 Requirements:
 
-- Windows x64; the desktop target is Windows 11 x64;
-- .NET SDK `10.0.302`, pinned by `global.json`; and
+- Windows x64;
+- .NET SDK `10.0.400`, pinned by `global.json`;
+- Microsoft.NETCore.App runtime `8.0.30` for the pinned SBOM tool during
+  release packaging only (it is not part of the app package); and
 - Windows PowerShell 5.1 or PowerShell 7+.
 
-```powershell
-dotnet restore .\PCCrashDiagnostic.sln --locked-mode
-dotnet test .\PCCrashDiagnostic.sln -c Release --no-restore
-```
-
-Build either staged release:
+Restore and test only the distributable graph:
 
 ```powershell
-.\tools\Build-Release.ps1 -Version 3.1.0-beta.1
-.\tools\Build-Release.ps1 -Version 3.1.0-beta.2
+dotnet restore .\PCCrashDiagnostic.Share.slnf --locked-mode `
+  -p:PCCrashDiagnosticFeatureProfile=ShareReadOnly `
+  -p:PCCrashDiagnosticRuntimeVersion=10.0.11
+
+dotnet test .\PCCrashDiagnostic.Share.slnf -c Release --no-restore `
+  -p:PCCrashDiagnosticFeatureProfile=ShareReadOnly `
+  -p:PCCrashDiagnosticRuntimeVersion=10.0.11
 ```
 
-The builder uses locked dependencies, runs the full unit/synthetic suite and static safety checks, publishes self-contained Windows x64 executables, produces source/runtime archives, records checksums and signature state, and smoke-checks the packaged version and feature stage. It refuses to overwrite an existing release directory.
+Create an unsigned local candidate from a clean checkout:
 
-Public distribution requires Authenticode signatures and RFC 3161 timestamps for both executables plus security validation of the exact finished package in a fresh disposable Windows VM. Signing does not replace that test.
+```powershell
+.\tools\Build-Release.ps1 -OutputRoot C:\release-candidates
+```
+
+The builder pins version `3.2.0-beta.1`, profile `ShareReadOnly`, SDK
+`10.0.400`, runtime `10.0.11`, and `win-x64`. It uses locked dependencies, runs
+the ShareReadOnly test graph and static checks, performs a packaged smoke test,
+and emits deterministic archives with:
+
+- schema-3 build/release manifests;
+- sanitized test evidence;
+- an SPDX 2.2 SBOM generated with the pinned Microsoft SBOM Tool 4.1.5;
+- an unattested in-toto/SLSA provenance statement; and
+- SHA-256 file identities.
+
+These artifacts improve traceability; they are not a substitute for publisher
+signing or final-package testing.
+
+## Release package
+
+A candidate directory contains exactly:
+
+- `PCCrashDiagnostic-3.2.0-beta.1-share-read-only-win-x64.zip`;
+- `PCCrashDiagnostic-3.2.0-beta.1-source.zip`;
+- `ReleaseManifest.json`; and
+- `SHA256SUMS.txt`.
+
+The runtime ZIP contains only one `.exe`. A friend should not be asked to
+perform a manual hash ritual; publisher identity comes from the verified
+Authenticode signature and trusted release channel. Checksums remain useful to
+bind build, signing, and VM evidence to exact bytes.
 
 ## Explicit exclusions
 
-PC Crash Diagnostic does not generate forced crashes, enable Driver Verifier, run stress tests or SMART self-tests, export raw EVTX logs, run SFC/DISM repairs, run `chkdsk /f`, change BIOS or drivers, tune hardware, or declare hardware guilty from one record.
+PC Crash Diagnostic does not generate forced crashes, enable Driver Verifier,
+run stress tests or SMART self-tests, export raw EVTX logs, run automatic
+SFC/DISM repairs or `chkdsk /f`, change BIOS or drivers, tune hardware, weaken
+security controls, or declare hardware faulty from one record.
 
-Licensed under the [MIT License](LICENSE). See [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), [docs/REPORT_FORMAT.md](docs/REPORT_FORMAT.md), and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+Licensed under the [MIT License](LICENSE). See [Development](docs/DEVELOPMENT.md),
+[Report format](docs/REPORT_FORMAT.md), [Security](SECURITY.md), and
+[Third-party notices](THIRD_PARTY_NOTICES.md).

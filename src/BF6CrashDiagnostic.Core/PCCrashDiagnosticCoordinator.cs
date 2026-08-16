@@ -32,6 +32,7 @@ public sealed class PCCrashDiagnosticCoordinator : IDisposable
     private readonly DriverDeviceCollector _driverCollector = new();
     private readonly DumpQualityCollector _dumpQualityCollector;
     private readonly Func<IReadOnlyList<DumpChkInstallation>> _discoverInstalledDumpCheckers;
+    private readonly Func<IReadOnlyList<CdbInstallation>> _discoverInstalledDebuggers;
     private readonly RecentChangeCollector _recentChangeCollector = new();
     private readonly StorageHealthCollector _storageHealthCollector = new();
     private readonly DriverVerifierCollector _driverVerifierCollector = new();
@@ -50,6 +51,7 @@ public sealed class PCCrashDiagnosticCoordinator : IDisposable
     private readonly ProtectedEvidenceHelper _protectedEvidenceHelper;
     private readonly ElevatedHelperRequestStore _helperRequestStore;
     private readonly Func<bool> _isBf6RunningFailClosed;
+    private readonly Func<string, bool> _isProtectedProcessRunning;
     private readonly Func<string, bool> _protectedDumpPathValidator;
     private readonly ConcurrentDictionary<string, BoundDump> _boundDumps = new(StringComparer.OrdinalIgnoreCase);
     private bool _disposed;
@@ -79,7 +81,9 @@ public sealed class PCCrashDiagnosticCoordinator : IDisposable
         CrashCaptureReceiptStore? crashCaptureReceiptStore = null,
         Func<CancellationToken, Task<CrashReadinessCollection>>? collectReadinessAsync = null,
         DumpQualityCollector? dumpQualityCollector = null,
-        Func<IReadOnlyList<DumpChkInstallation>>? discoverInstalledDumpCheckers = null)
+        Func<IReadOnlyList<DumpChkInstallation>>? discoverInstalledDumpCheckers = null,
+        Func<IReadOnlyList<CdbInstallation>>? discoverInstalledDebuggers = null,
+        Func<string, bool>? isProtectedProcessRunning = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(dataRoot);
         if (!Path.IsPathFullyQualified(dataRoot))
@@ -91,6 +95,7 @@ public sealed class PCCrashDiagnosticCoordinator : IDisposable
         _reportWriter = new ReportWriter(_dataRoot);
         _delayAsync = delayAsync ?? throw new ArgumentNullException(nameof(delayAsync));
         _isBf6RunningFailClosed = isBf6RunningFailClosed ?? IsBf6RunningFailClosed;
+        _isProtectedProcessRunning = isProtectedProcessRunning ?? IsProcessRunning;
         _dumpCollector = dumpInventoryCollector ?? new DumpInventoryCollector();
         _crashCaptureConfigurationStore = crashCaptureConfigurationStore ?? new WindowsCrashCaptureConfigurationStore();
         _crashCaptureReceiptStore = crashCaptureReceiptStore ?? new CrashCaptureReceiptStore();
@@ -101,6 +106,7 @@ public sealed class PCCrashDiagnosticCoordinator : IDisposable
         _collectReadinessAsync = collectReadinessAsync ?? _readinessCollector.CollectAsync;
         _dumpQualityCollector = dumpQualityCollector ?? new DumpQualityCollector();
         _discoverInstalledDumpCheckers = discoverInstalledDumpCheckers ?? (() => new DumpChkDiscovery().Discover());
+        _discoverInstalledDebuggers = discoverInstalledDebuggers ?? (() => new CdbDiscovery().Discover());
         _helperRequestStore = helperRequestStore ?? new ElevatedHelperRequestStore();
         ProtectedEvidenceRoots protectedRoots = ProtectedEvidenceRoots.CreateDefault();
         _protectedEvidenceHelper = protectedEvidenceHelper ?? new ProtectedEvidenceHelper();
@@ -775,6 +781,15 @@ public sealed class PCCrashDiagnosticCoordinator : IDisposable
     {
         ThrowIfDisposed();
         ValidateSelection(selection);
+        if (selection.Method == IncidentSelectionMethod.ManualTime &&
+            selection.Candidate.EvidenceOrigin == IncidentEvidenceOrigin.Unknown)
+        {
+            selection = selection with
+            {
+                Candidate = selection.Candidate with { EvidenceOrigin = IncidentEvidenceOrigin.ManualTime }
+            };
+        }
+
         progress?.Report(new DiagnosticProgress("Collecting", "Reading Windows records for the selected incident.", 0.08));
         SystemSnapshotCollection snapshot = await _snapshotCollector.CollectAsync(cancellationToken).ConfigureAwait(false);
         return await BuildReportAsync(
@@ -889,7 +904,8 @@ public sealed class PCCrashDiagnosticCoordinator : IDisposable
                 1,
                 1,
                 disappearedUtc,
-                disappearedUtc);
+                disappearedUtc,
+                IncidentEvidenceOrigin.MonitorObservation);
             IncidentSelection selection = _incidentDiscovery.Select(
                 candidate,
                 IncidentSelectionMethod.Automatic,
@@ -956,7 +972,8 @@ public sealed class PCCrashDiagnosticCoordinator : IDisposable
                 1,
                 1,
                 lastSample,
-                lastSample);
+                lastSample,
+                IncidentEvidenceOrigin.MonitorObservation);
             IncidentSelection selection = _incidentDiscovery.Select(
                 candidate,
                 IncidentSelectionMethod.RecoveredSession,
@@ -991,9 +1008,10 @@ public sealed class PCCrashDiagnosticCoordinator : IDisposable
         CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
-        if (_isBf6RunningFailClosed())
+        if (IsSensitiveOperationBlocked(targetProfile: null))
         {
-            throw new InvalidOperationException("Dump inspection is unavailable while Battlefield 6 is running.");
+            throw new InvalidOperationException(
+                "Dump inspection is unavailable while Battlefield 6, EA AntiCheat, or Javelin is running.");
         }
 
         return new SafeDumpInspector().Inspect(path, kind, source, cancellationToken);
@@ -1314,10 +1332,16 @@ public sealed class PCCrashDiagnosticCoordinator : IDisposable
         var dumpInventory = new DumpInventory(dumps, dumpStatuses);
         IReadOnlyList<DuplicateEventGroup> groups = _eventAnalyzer.GroupDuplicates(events);
         IReadOnlyList<BugcheckRecord> bugchecks = BugcheckRecordDecoder.Decode(events);
+        IReadOnlyList<WheaEvidence> wheaEvidence = WheaEvidenceSummarizer.Summarize(events);
         IncidentSelection? selection = prior.IncidentSelection;
         CrashCorrelation? correlation = selection is null
             ? prior.CrashCorrelation
-            : _correlator.Correlate(selection, bugchecks, dumps, prior.EndSnapshot?.LastBootUtc);
+            : _correlator.Correlate(
+                selection,
+                bugchecks,
+                dumps,
+                prior.EndSnapshot?.LastBootUtc,
+                prior.BootSession);
         CrashAnchor? anchor = selection is null
             ? null
             : new CrashAnchor(
@@ -1338,8 +1362,14 @@ public sealed class PCCrashDiagnosticCoordinator : IDisposable
                 prior.Reliability,
                 prior.Artifacts,
                 compatibilitySamples,
-                prior.TargetProfile)
+                prior.TargetProfile,
+                selection?.Candidate)
             .Concat(CreateWheaCategoryFindings(events))
+            .Concat(DiagnosticContextAnalyzer.CreatePreviewBuildFinding(
+                prior.StartSnapshot,
+                prior.EndSnapshot) is { } previewFinding
+                    ? [previewFinding]
+                    : [])
             .Concat(_extendedEvidenceAnalyzer.Analyze(
                 prior.DumpQuality,
                 prior.RecentChanges,
@@ -1359,7 +1389,8 @@ public sealed class PCCrashDiagnosticCoordinator : IDisposable
             prior.DumpQuality,
             prior.RecentChanges,
             prior.StorageHealth,
-            prior.DriverVerifier);
+            prior.DriverVerifier,
+            prior.BootSession);
         string summary = _summaryBuilder.Build(
             ToolVersion,
             prior.SessionId,
@@ -1376,7 +1407,8 @@ public sealed class PCCrashDiagnosticCoordinator : IDisposable
             prior.DumpQuality,
             prior.RecentChanges,
             prior.StorageHealth,
-            prior.DriverVerifier);
+            prior.DriverVerifier,
+            prior.BootSession);
         DiagnosticReportV3 updated = prior with
         {
             ToolVersion = ToolVersion,
@@ -1389,6 +1421,7 @@ public sealed class PCCrashDiagnosticCoordinator : IDisposable
             Bugchecks = bugchecks,
             DumpInventory = dumpInventory,
             CrashCorrelation = correlation,
+            WheaEvidence = wheaEvidence,
             Summary = summary
         };
 
@@ -1584,7 +1617,7 @@ public sealed class PCCrashDiagnosticCoordinator : IDisposable
                 return await _dumpPackager.PackageForReportAsync(
                     identity,
                     _reportWriter.ReportsRoot,
-                    () => _isBf6RunningFailClosed() || IsTargetRunningFailClosed(report.TargetProfile),
+                    () => IsSensitiveOperationBlocked(report.TargetProfile),
                     new DumpPackageContext(
                         report.SessionId,
                         reportContext.Package.Sha256,
@@ -1619,7 +1652,7 @@ public sealed class PCCrashDiagnosticCoordinator : IDisposable
         return _dumpPackager.PackageForReportAsync(
             bound.Identity,
             _reportWriter.ReportsRoot,
-            () => _isBf6RunningFailClosed() || IsTargetRunningFailClosed(bound.TargetProfile),
+            () => IsSensitiveOperationBlocked(bound.TargetProfile),
             new DumpPackageContext(bound.SessionId, bound.ReportSha256, bound.SourceType),
             progress,
             cancellationToken);
@@ -1628,7 +1661,27 @@ public sealed class PCCrashDiagnosticCoordinator : IDisposable
     public IReadOnlyList<CdbInstallation> DiscoverInstalledDebuggers()
     {
         ThrowIfDisposed();
-        return new CdbDiscovery().Discover();
+        return _discoverInstalledDebuggers()
+            .Where(item => item.IsMicrosoftSigned && item.IsX64)
+            .OrderByDescending(item => Version.TryParse(item.Version, out Version? version) ? version : new Version())
+            .ThenBy(item => item.Source, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
+    public DebuggerAvailability InspectDebuggerAvailability()
+    {
+        CdbInstallation? debugger = DiscoverInstalledDebuggers().FirstOrDefault();
+        return debugger is null
+            ? new DebuggerAvailability(
+                DebuggerAvailabilityState.NotFound,
+                string.Empty,
+                "Microsoft WinDbg",
+                "No Microsoft-signed x64 cdb.exe was found. Install WinDbg from Microsoft, then reopen this report to run optional dump analysis.")
+            : new DebuggerAvailability(
+                DebuggerAvailabilityState.Available,
+                debugger.Version,
+                debugger.Source,
+                "Microsoft-signed x64 WinDbg command-line tools are available for optional local dump analysis.");
     }
 
     public async Task<DiagnosticOperationResultV3> RunOptionalDebuggerAnalysisAsync(
@@ -1737,7 +1790,8 @@ public sealed class PCCrashDiagnosticCoordinator : IDisposable
             quality,
             prior.RecentChanges,
             prior.StorageHealth,
-            prior.DriverVerifier);
+            prior.DriverVerifier,
+            prior.BootSession);
         string summary = _summaryBuilder.Build(
             ToolVersion,
             prior.SessionId,
@@ -1754,7 +1808,8 @@ public sealed class PCCrashDiagnosticCoordinator : IDisposable
             quality,
             prior.RecentChanges,
             prior.StorageHealth,
-            prior.DriverVerifier);
+            prior.DriverVerifier,
+            prior.BootSession);
         DiagnosticReportV3 updated = prior with
         {
             ToolVersion = ToolVersion,
@@ -1883,7 +1938,8 @@ public sealed class PCCrashDiagnosticCoordinator : IDisposable
             prior.DumpQuality,
             prior.RecentChanges,
             prior.StorageHealth,
-            prior.DriverVerifier);
+            prior.DriverVerifier,
+            prior.BootSession);
         DiagnosticReportV3 updated = prior with
         {
             CrashCorrelation = correlation,
@@ -2236,11 +2292,10 @@ public sealed class PCCrashDiagnosticCoordinator : IDisposable
             return true;
         }
 
-        string[] protectedNames = ["BF6", "EAAntiCheat", "Javelin"];
         return target.ProcessNames
                    .Concat(target.RelatedProcessNames)
-                   .Any(name => protectedNames.Contains(
-                       Path.GetFileNameWithoutExtension(name),
+                   .Any(name => ProtectedProcessGuard.AlwaysProtectedProcessNames.Contains(
+                       ProtectedProcessGuard.NormalizeProcessName(name),
                        StringComparer.OrdinalIgnoreCase)) ||
                target.ApplicationEventSignals.Any(signal =>
                    signal.Contains("anti-cheat", StringComparison.OrdinalIgnoreCase) ||
@@ -2515,14 +2570,11 @@ public sealed class PCCrashDiagnosticCoordinator : IDisposable
 
     private bool IsSensitiveOperationBlocked(TargetProfile? targetProfile)
     {
-        try
-        {
-            return _isBf6RunningFailClosed() || IsTargetRunningFailClosed(targetProfile);
-        }
-        catch
-        {
-            return true;
-        }
+        return ProtectedProcessGuard.IsBlocked(targetProfile, processName =>
+            ProtectedProcessGuard.NormalizeProcessName(processName)
+                .Equals("BF6", StringComparison.OrdinalIgnoreCase)
+                ? _isBf6RunningFailClosed()
+                : _isProtectedProcessRunning(processName));
     }
 
     private static TimeSpan NormalizeHelperTimeout(TimeSpan? timeout)
@@ -2668,6 +2720,9 @@ public sealed class PCCrashDiagnosticCoordinator : IDisposable
     {
         progress?.Report(new DiagnosticProgress("Collecting", "Reading crash, reliability, readiness, dump, and driver evidence.", 0.28));
         Task<WindowsEventCollection> eventTask = _eventCollector.CollectWindowAsync(startUtc, endUtc, targetProfile, cancellationToken);
+        Task<WindowsEventCollection> bootMarkerTask = _eventCollector.CollectBootMarkersAsync(
+            selection.Candidate.TimeUtc,
+            cancellationToken);
         Task<ReliabilityCollection> reliabilityTask = _reliabilityCollector.CollectAsync(startUtc, endUtc, targetProfile, cancellationToken);
         Task<ArtifactCollection> artifactTask = _artifactCollector.CollectAsync(startUtc, endUtc, targetProfile, cancellationToken);
         Task<CrashReadinessCollection> readinessTask = _collectReadinessAsync(cancellationToken);
@@ -2684,6 +2739,7 @@ public sealed class PCCrashDiagnosticCoordinator : IDisposable
             cancellationToken);
 
         WindowsEventCollection events = await eventTask.ConfigureAwait(false);
+        WindowsEventCollection bootMarkers = await bootMarkerTask.ConfigureAwait(false);
         ReliabilityCollection reliability = await reliabilityTask.ConfigureAwait(false);
         ArtifactCollection artifacts = await artifactTask.ConfigureAwait(false);
         CrashReadinessCollection readiness = await readinessTask.ConfigureAwait(false);
@@ -2692,8 +2748,18 @@ public sealed class PCCrashDiagnosticCoordinator : IDisposable
         StorageHealthSnapshot? storageHealth = await storageHealthTask.ConfigureAwait(false);
         DriverVerifierState? driverVerifier = await driverVerifierTask.ConfigureAwait(false);
         DumpInventory dumps = await dumpTask.ConfigureAwait(false);
+        BootSessionContext bootSession = new BootSessionReconstructor().Reconstruct(
+            selection.Candidate.TimeUtc,
+            bootMarkers.Events,
+            endSnapshot?.LastBootUtc);
         IReadOnlyList<BugcheckRecord> bugchecks = BugcheckRecordDecoder.Decode(events.Events);
-        CrashCorrelation correlation = _correlator.Correlate(selection, bugchecks, dumps.Candidates, endSnapshot?.LastBootUtc);
+        IReadOnlyList<WheaEvidence> wheaEvidence = WheaEvidenceSummarizer.Summarize(events.Events);
+        CrashCorrelation correlation = _correlator.Correlate(
+            selection,
+            bugchecks,
+            dumps.Candidates,
+            endSnapshot?.LastBootUtc,
+            bootSession);
         DumpQuality? dumpQuality = !ReleaseStage.Beta2FeaturesEnabled || correlation.SelectedDump is null
             ? null
             : await _dumpQualityCollector.InspectAsync(
@@ -2718,8 +2784,14 @@ public sealed class PCCrashDiagnosticCoordinator : IDisposable
                 reliability.Records,
                 artifacts.Artifacts,
                 compatibilitySamples,
-                targetProfile)
+                targetProfile,
+                selection.Candidate)
             .Concat(CreateWheaCategoryFindings(events.Events))
+            .Concat(DiagnosticContextAnalyzer.CreatePreviewBuildFinding(
+                startSnapshot,
+                endSnapshot) is { } previewFinding
+                    ? [previewFinding]
+                    : [])
             .Concat(_extendedEvidenceAnalyzer.Analyze(dumpQuality, recentChanges, storageHealth, driverVerifier))
             .OrderBy(finding => finding.Rank)
             .ToArray();
@@ -2731,6 +2803,7 @@ public sealed class PCCrashDiagnosticCoordinator : IDisposable
         DiagnosticFinding[] safeFindings = findings.Select(_redactor.RedactFinding).ToArray();
         CollectionStatus[] statuses = initialStatuses
             .Concat(events.Statuses)
+            .Concat(bootMarkers.Statuses)
             .Concat(reliability.Statuses)
             .Concat(artifacts.Statuses)
             .Concat(readiness.Statuses)
@@ -2759,7 +2832,8 @@ public sealed class PCCrashDiagnosticCoordinator : IDisposable
             dumpQuality,
             recentChanges,
             storageHealth,
-            driverVerifier);
+            driverVerifier,
+            bootSession);
         string summary = _summaryBuilder.Build(
             ToolVersion,
             sessionId,
@@ -2776,7 +2850,8 @@ public sealed class PCCrashDiagnosticCoordinator : IDisposable
             dumpQuality,
             recentChanges,
             storageHealth,
-            driverVerifier);
+            driverVerifier,
+            bootSession);
         var report = new DiagnosticReportV3(
             3,
             ToolVersion,
@@ -2809,7 +2884,9 @@ public sealed class PCCrashDiagnosticCoordinator : IDisposable
             dumpQuality,
             recentChanges,
             storageHealth,
-            driverVerifier);
+            driverVerifier,
+            bootSession,
+            wheaEvidence);
 
         progress?.Report(new DiagnosticProgress("Packaging", "Writing the local schema-v3 report and checksum.", 0.88));
         ReportPackageV3 package = await _reportWriter.WriteV3Async(report, cancellationToken).ConfigureAwait(false);
@@ -3013,7 +3090,8 @@ public sealed class PCCrashDiagnosticCoordinator : IDisposable
         DumpQuality? dumpQuality = null,
         RecentChangeTimeline? recentChanges = null,
         StorageHealthSnapshot? storageHealth = null,
-        DriverVerifierState? driverVerifier = null)
+        DriverVerifierState? driverVerifier = null,
+        BootSessionContext? bootSession = null)
     {
         return statuses
             .GroupBy(status => status.Source, StringComparer.OrdinalIgnoreCase)
@@ -3022,10 +3100,16 @@ public sealed class PCCrashDiagnosticCoordinator : IDisposable
                 CollectionStatus status = group.Last();
                 int count = status.Source switch
                 {
+                    string source when source.Contains("boot markers", StringComparison.OrdinalIgnoreCase) =>
+                        bootSession?.Records.Count ?? 0,
                     string source when source.Contains("Event Log/System", StringComparison.OrdinalIgnoreCase) =>
                         events.Count(item => item.LogName.Equals("System", StringComparison.OrdinalIgnoreCase)),
                     string source when source.Contains("Event Log/Application", StringComparison.OrdinalIgnoreCase) =>
                         events.Count(item => item.LogName.Equals("Application", StringComparison.OrdinalIgnoreCase)),
+                    string source when source.Contains("Kernel-EventTracing", StringComparison.OrdinalIgnoreCase) =>
+                        events.Count(item => item.LogName.Equals(
+                            KernelEventTracingCatalog.AdminLogName,
+                            StringComparison.OrdinalIgnoreCase)),
                     string source when source.Contains("Reliability", StringComparison.OrdinalIgnoreCase) => reliability.Count,
                     string source when source.Contains("artifact", StringComparison.OrdinalIgnoreCase) => artifacts.Count,
                     string source when source.Contains("Dump inventory", StringComparison.OrdinalIgnoreCase) => dumps.Count,
@@ -3093,26 +3177,6 @@ public sealed class PCCrashDiagnosticCoordinator : IDisposable
         }
     }
 
-    private static bool IsTargetRunningFailClosed(TargetProfile? target)
-    {
-        if (target is null || !target.BlockSensitiveOperationsWhileRunning)
-        {
-            return false;
-        }
-
-        try
-        {
-            return target.ProcessNames
-                .Concat(target.RelatedProcessNames)
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .Any(IsProcessRunning);
-        }
-        catch
-        {
-            return true;
-        }
-    }
-
     private static bool IsBf6RunningFailClosed()
     {
         try
@@ -3127,7 +3191,7 @@ public sealed class PCCrashDiagnosticCoordinator : IDisposable
 
     private static bool IsProcessRunning(string processName)
     {
-        Process[] processes = Process.GetProcessesByName(Path.GetFileNameWithoutExtension(processName));
+        Process[] processes = Process.GetProcessesByName(ProtectedProcessGuard.NormalizeProcessName(processName));
         try
         {
             return processes.Any(process =>

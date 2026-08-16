@@ -1,0 +1,17 @@
+# Confirm this owner remains correct before enabling branch protection or the
+# SignPath workflow. Add a maintainer team when the project has one.
+* @brads93
+/.github/workflows/ @brads93
+/.config/release/ @brads93
+/.config/signpath/ @brads93
+/.config/dotnet-tools.json @brads93
+/CODE_SIGNING_POLICY.md @brads93
+/Directory.Build.props @brads93
+/global.json @brads93
+/**/packages.lock.json @brads93
+/tools/Build-Release.ps1 @brads93
+/tools/Finalize-Release.ps1 @brads93
+/tools/New-ReleaseProvenance.ps1 @brads93
+/tools/New-ReleaseSbom.ps1 @brads93
+/tools/New-TestEvidence.ps1 @brads93
+/tools/Verify-Release.ps1 @brads93

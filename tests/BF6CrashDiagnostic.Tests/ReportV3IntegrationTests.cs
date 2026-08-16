@@ -189,6 +189,11 @@ public sealed class ReportV3IntegrationTests
 
         IncidentLibraryEntry incident = Assert.Single(snapshot.Incidents);
         Assert.Equal(second.ZipPath, incident.ReportPath, ignoreCase: true);
+        Assert.Equal(2, Assert.IsAssignableFrom<IReadOnlyList<LocalReportCopy>>(incident.LocalCopies).Count);
+        Assert.Contains(incident.LocalCopies!, copy =>
+            string.Equals(copy.ReportPath, first.ZipPath, StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(incident.LocalCopies!, copy =>
+            string.Equals(copy.ReportPath, second.ZipPath, StringComparison.OrdinalIgnoreCase));
         Assert.Contains("sampledriver.sys", incident.Modules);
     }
 

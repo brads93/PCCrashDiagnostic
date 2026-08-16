@@ -14,9 +14,13 @@
     </PackageReference>
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\src\BF6CrashDiagnostic.Core\BF6CrashDiagnostic.Core.csproj" />
+    <ProjectReference Include="..\..\src\PCCrashDiagnostic.Privileged\PCCrashDiagnostic.Privileged.csproj" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Fixtures\**\*" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
+  <Target Name="ValidateInternalDiagnosticTestProfile" BeforeTargets="PrepareForBuild">
+    <Error Condition="'$(PCCrashDiagnosticFeatureProfile)' != 'FullDiagnostic' and '$(PCCrashDiagnosticFeatureProfile)' != 'WerResearch'"
+           Text="BF6CrashDiagnostic.Tests exercise the internal diagnostic graph and require FullDiagnostic or WerResearch." />
+  </Target>
 </Project>

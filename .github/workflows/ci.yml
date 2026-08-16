@@ -1,0 +1,133 @@
+name: ShareReadOnly CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: share-read-only-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Build and test ShareReadOnly
+    runs-on: windows-2025
+    timeout-minutes: 30
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+      DOTNET_NOLOGO: "1"
+    steps:
+      - name: Check out source
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install pinned .NET SDK
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          dotnet-version: |
+            8.0.424
+            10.0.400
+          cache: true
+          cache-dependency-path: |
+            .config/dotnet-tools.json
+            **/packages.lock.json
+
+      - name: Validate static release boundaries
+        shell: pwsh
+        run: |
+          ./tools/Test-SafetyBoundary.ps1 -ExpectedFeatureProfile ShareReadOnly
+          ./tools/Test-ReleaseIdentity.ps1 -RequireRepositoryIdentity
+
+      - name: Restore locked ShareReadOnly graph
+        shell: pwsh
+        run: |
+          dotnet tool restore --tool-manifest ./.config/dotnet-tools.json
+          $properties = @(
+            '-p:PCCrashDiagnosticVersion=3.2.0-beta.1'
+            '-p:PCCrashDiagnosticFeatureProfile=ShareReadOnly'
+            '-p:PCCrashDiagnosticWerLocalDumpCapture=Disabled'
+            '-p:PCCrashDiagnosticRuntimeVersion=10.0.11'
+          )
+          dotnet restore ./PCCrashDiagnostic.Share.slnf --locked-mode `
+            --artifacts-path "${{ runner.temp }}/pcd-artifacts" @properties
+          dotnet restore ./src/PCCrashDiagnostic.App/PCCrashDiagnostic.App.csproj `
+            -r win-x64 --locked-mode --artifacts-path "${{ runner.temp }}/pcd-artifacts" `
+            -p:NuGetAudit=true -p:NuGetAuditMode=all -p:NuGetAuditLevel=low `
+            -warnaserror:NU1901,NU1902,NU1903,NU1904 @properties
+
+      - name: Test ShareReadOnly graph
+        shell: pwsh
+        run: >-
+          dotnet test ./PCCrashDiagnostic.Share.slnf -c Release --no-restore
+          --artifacts-path "${{ runner.temp }}/pcd-artifacts"
+          --logger "trx;LogFileName=share-read-only-ci.trx"
+          --results-directory "${{ runner.temp }}/pcd-test-results"
+          -p:PCCrashDiagnosticVersion=3.2.0-beta.1
+          -p:PCCrashDiagnosticFeatureProfile=ShareReadOnly
+          -p:PCCrashDiagnosticWerLocalDumpCapture=Disabled
+          -p:PCCrashDiagnosticRuntimeVersion=10.0.11
+
+      - name: Publish, audit public IL/resources, and verify exact runtime smoke
+        shell: pwsh
+        run: |
+          $properties = @(
+            '-p:PCCrashDiagnosticVersion=3.2.0-beta.1'
+            '-p:PCCrashDiagnosticFeatureProfile=ShareReadOnly'
+            '-p:PCCrashDiagnosticWerLocalDumpCapture=Disabled'
+            '-p:PCCrashDiagnosticRuntimeVersion=10.0.11'
+          )
+          $publishRoot = '${{ runner.temp }}/pcd-publish'
+          dotnet publish ./src/PCCrashDiagnostic.App/PCCrashDiagnostic.App.csproj `
+            -c Release -r win-x64 --self-contained true --no-restore `
+            --artifacts-path "${{ runner.temp }}/pcd-artifacts" -o $publishRoot `
+            -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true `
+            -p:EnableCompressionInSingleFile=true -p:PublishTrimmed=false @properties
+          ./tools/Test-PublicArtifactAudit.ps1 `
+            -RestoreArtifactsRoot "${{ runner.temp }}/pcd-artifacts" `
+            -PublishRoot $publishRoot -OutputPath '${{ runner.temp }}/public-artifact-audit.json'
+          $smokeRoot = '${{ runner.temp }}/pcd-smoke'
+          New-Item -ItemType Directory -Path $smokeRoot | Out-Null
+          $process = Start-Process -FilePath (Join-Path $publishRoot 'PCCrashDiagnostic.exe') `
+            -ArgumentList '--smoke-test', '--data-root', "`"$smokeRoot`"" -PassThru -Wait
+          if ($process.ExitCode -ne 0) { throw "Smoke test exited with $($process.ExitCode)." }
+          $marker = Get-Content -LiteralPath (Join-Path $smokeRoot 'smoke-test.json') -Raw | ConvertFrom-Json
+          if ([string]$marker.RuntimeVersion -cne '10.0.11' -or [string]$marker.FeatureProfile -cne 'ShareReadOnly' -or
+              [bool]$marker.PrivilegedOperationsEnabled) { throw 'Exact runtime/profile smoke gate failed.' }
+
+      - name: Generate sanitized aggregate release evidence
+        shell: pwsh
+        run: |
+          ./tools/New-TestEvidence.ps1 `
+            -TrxPath '${{ runner.temp }}/pcd-test-results/share-read-only-ci.trx' `
+            -OutputPath '${{ runner.temp }}/TestEvidence.json' `
+            -FeatureProfile ShareReadOnly -Version 3.2.0-beta.1 `
+            -SourceCommit '${{ github.sha }}' -SourceTreeState clean `
+            -SafetyBoundaryPassed $true -PackagedSmokePassed $true `
+            -DependencyVulnerabilityAuditPassed $true `
+            -PublicArtifactAuditPath '${{ runner.temp }}/public-artifact-audit.json'
+
+      - name: Upload sanitized aggregate release evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: share-read-only-sanitized-evidence-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/TestEvidence.json
+            ${{ runner.temp }}/public-artifact-audit.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload restricted raw test evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: share-read-only-test-results-${{ github.run_id }}
+          path: ${{ runner.temp }}/pcd-test-results/*.trx
+          if-no-files-found: error
+          retention-days: 7

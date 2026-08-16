@@ -1,6 +1,8 @@
 [CmdletBinding()]
 param(
-    [string]$RepoRoot
+    [string]$RepoRoot,
+    [ValidateSet('ShareReadOnly', 'FullDiagnostic', 'WerResearch')]
+    [string]$ExpectedFeatureProfile = 'ShareReadOnly'
 )
 
 Set-StrictMode -Version Latest
@@ -10,435 +12,175 @@ if ([string]::IsNullOrWhiteSpace($RepoRoot)) {
     $RepoRoot = Join-Path $PSScriptRoot '..'
 }
 $repoRootFull = [IO.Path]::GetFullPath($RepoRoot)
-$sourceRoot = Join-Path $repoRootFull 'src'
-$manifestPath = Join-Path $sourceRoot 'BF6CrashDiagnostic.App\app.manifest'
-$appProjectPath = Join-Path $sourceRoot 'BF6CrashDiagnostic.App\BF6CrashDiagnostic.App.csproj'
-$configurationStorePath = Join-Path $sourceRoot 'BF6CrashDiagnostic.Core\Collectors\CrashCaptureConfigurationStore.cs'
-$protectedHelperPath = Join-Path $sourceRoot 'BF6CrashDiagnostic.Core\Collectors\ProtectedEvidenceHelper.cs'
-$advancedModelsPath = Join-Path $sourceRoot 'BF6CrashDiagnostic.Core\Models\AdvancedDiagnosticModels.cs'
-$boundedRunnerPath = Join-Path $sourceRoot 'BF6CrashDiagnostic.Core\Collectors\BoundedCommandRunner.cs'
-$dumpQualityCollectorPath = Join-Path $sourceRoot 'BF6CrashDiagnostic.Core\Collectors\DumpQualityCollector.cs'
-$driverVerifierCollectorPath = Join-Path $sourceRoot 'BF6CrashDiagnostic.Core\Collectors\DriverVerifierCollector.cs'
-$winDbgRunnerPath = Join-Path $sourceRoot 'BF6CrashDiagnostic.Core\Analysis\WinDbgRunner.cs'
-$elevatedHelperClientPath = Join-Path $sourceRoot 'BF6CrashDiagnostic.Core\Collectors\ElevatedHelperClient.cs'
-$desktopInteractionPath = Join-Path $sourceRoot 'BF6CrashDiagnostic.App\Services\DesktopInteractionService.cs'
-$buildPropsPath = Join-Path $repoRootFull 'Directory.Build.props'
-$releaseBuildPath = Join-Path $repoRootFull 'tools\Build-Release.ps1'
-$releaseVerifyPath = Join-Path $repoRootFull 'tools\Verify-Release.ps1'
+$violations = [Collections.Generic.List[string]]::new()
 
-foreach ($requiredPath in @(
-        $sourceRoot,
-        $manifestPath,
-        $appProjectPath,
-        $configurationStorePath,
-        $protectedHelperPath,
-        $advancedModelsPath,
-        $boundedRunnerPath,
-        $dumpQualityCollectorPath,
-        $driverVerifierCollectorPath,
-        $winDbgRunnerPath,
-        $elevatedHelperClientPath,
-        $desktopInteractionPath,
-        $buildPropsPath,
-        $releaseBuildPath,
-        $releaseVerifyPath)) {
-    if (-not (Test-Path -LiteralPath $requiredPath)) {
-        throw "Safety scan input is missing: $requiredPath"
+function Read-RequiredText {
+    param([Parameter(Mandatory)][string]$RelativePath)
+    $path = Join-Path $repoRootFull $RelativePath
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+        $violations.Add("Required safety input is missing: $RelativePath")
+        return ''
+    }
+    return Get-Content -LiteralPath $path -Raw
+}
+
+function Require-Literal {
+    param([string]$Text, [string]$Literal, [string]$Description)
+    if ($Text.IndexOf($Literal, [StringComparison]::Ordinal) -lt 0) {
+        $violations.Add("$Description is missing: $Literal")
     }
 }
 
-$sourceFiles = @(
-    Get-ChildItem -LiteralPath $sourceRoot -File -Recurse |
-        Where-Object {
-            $_.Extension -in @('.cs', '.xaml', '.csproj', '.manifest') -and
-            $_.FullName -notmatch '[\\/](?:bin|obj)[\\/]'
-        }
-)
-if ($sourceFiles.Count -eq 0) { throw 'No source files were found for the safety scan.' }
-
-$forbiddenPatterns = [ordered]@{
-    'network API' = '\b(?:System\.Net|HttpClient|HttpRequestMessage|WebRequest|WebClient|TcpClient|UdpClient|Socket|Dns)\b'
-    'native network API' = '\b(?:WinHttp|InternetOpen|InternetConnect|HttpOpenRequest|URLDownloadToFile|BITSManager|ClientWebSocket)\w*\s*\('
-    'process memory or injection API' = '\b(?:ReadProcessMemory|WriteProcessMemory|VirtualAllocEx|CreateRemoteThread|QueueUserAPC|NtMapViewOfSection)\s*\('
-    'hook, debugger, or input-capture API' = '\b(?:SetWindowsHookEx|GetAsyncKeyState|RegisterRawInputDevices|DebugActiveProcess|Debugger\.Launch|MiniDumpWriteDump)\b'
-    'process module or command-line inspection' = '\b(?:Process\s*\.\s*Modules|process(?:es)?\s*\.\s*Modules|MainModule|Win32_Process[^\r\n]*CommandLine|NtQueryInformationProcess)\b'
-    'unapproved persistence API' = '\b(?:ServiceController|TaskScheduler|StartupTask|RunOnce)\b'
-    'native registry mutation API' = '\bReg(?:SetValue|CreateKey|DeleteKey|DeleteValue|LoadKey|RestoreKey|ReplaceKey)(?:Ex|Transacted)?[AW]?\s*\('
-    'security-control weakening command' = '\b(?:Set-MpPreference|DisableAntiSpyware|nointegritychecks|testsigning|DisableRealtimeMonitoring)\b'
-    'command interpreter launch' = '(?i)\b(?:cmd|powershell|pwsh|wscript|cscript|mshta|rundll32)(?:\.exe)?\b'
-    'shell command argument' = '(?i)["''](?:/c|/k|-command|-encodedcommand|-enc)["'']'
-    'repair or mutating disk command' = '(?i)\b(?:sfc|dism|chkdsk|Repair-WindowsImage)(?:\.exe)?\b'
-    'reboot or shutdown API' = '(?i)\b(?:shutdown\.exe|Restart-Computer|Stop-Computer|ExitWindowsEx|InitiateSystemShutdown(?:Ex)?|Win32Shutdown)\b'
-    'forced-crash mechanism' = '(?i)\b(?:NtRaiseHardError|RtlAdjustPrivilege|RaiseFailFastException|Environment\.FailFast|NotMyFault|CrashOnCtrlScroll|NMICrashDump|KeBugCheck(?:Ex)?)\b'
-    'stress-test launcher' = '(?i)\b(?:prime95|furmark|occt|memtest86|memtest64|y-cruncher)(?:\.exe)?\b'
-    'Driver Verifier mutation argument' = '(?i)["'']/(?:reset|standard|all|driver|bootmode|volatile|flags)\b'
+function Reject-Pattern {
+    param([string]$Text, [string]$Pattern, [string]$Description)
+    if ($Text -match $Pattern) { $violations.Add($Description) }
 }
 
-$violations = New-Object System.Collections.Generic.List[string]
-foreach ($category in $forbiddenPatterns.Keys) {
-    foreach ($match in (Select-String -LiteralPath $sourceFiles.FullName -Pattern $forbiddenPatterns[$category] -AllMatches)) {
-        $relative = $match.Path.Substring($repoRootFull.Length).TrimStart('\', '/')
-        $violations.Add("$category at $relative`:$($match.LineNumber): $($match.Line.Trim())")
+$buildProps = Read-RequiredText 'Directory.Build.props'
+$capabilities = Read-RequiredText 'src\PCCrashDiagnostic.Contracts\ProductCapabilities.cs'
+$shareFilter = Read-RequiredText 'PCCrashDiagnostic.Share.slnf'
+$fullFilter = Read-RequiredText 'PCCrashDiagnostic.Full.slnf'
+$shareProjectGraph = @(
+    Read-RequiredText 'src\PCCrashDiagnostic.Contracts\PCCrashDiagnostic.Contracts.csproj'
+    Read-RequiredText 'src\PCCrashDiagnostic.Core\PCCrashDiagnostic.Core.csproj'
+    Read-RequiredText 'src\PCCrashDiagnostic.LocalTools\PCCrashDiagnostic.LocalTools.csproj'
+    Read-RequiredText 'src\PCCrashDiagnostic.App\PCCrashDiagnostic.App.csproj'
+    Read-RequiredText 'tests\PCCrashDiagnostic.Share.Tests\PCCrashDiagnostic.Share.Tests.csproj'
+) -join "`n"
+$appManifest = Read-RequiredText 'src\PCCrashDiagnostic.App\app.manifest'
+$buildRelease = Read-RequiredText 'tools\Build-Release.ps1'
+$verifyRelease = Read-RequiredText 'tools\Verify-Release.ps1'
+$finalizeRelease = Read-RequiredText 'tools\Finalize-Release.ps1'
+$buildManifestSchema = Read-RequiredText '.config\release\BuildManifest.schema.json'
+$releaseManifestSchema = Read-RequiredText '.config\release\ReleaseManifest.schema.json'
+$testEvidenceSchema = Read-RequiredText '.config\release\TestEvidence.schema.json'
+$vmEvidenceSchema = Read-RequiredText '.config\release\ExactPackageVmEvidence.schema.json'
+$toolManifest = Read-RequiredText '.config\dotnet-tools.json'
+$signPathArtifact = Read-RequiredText '.config\signpath\share-read-only-artifact-configuration.xml'
+$signPathSourcePolicy = Read-RequiredText '.config\signpath\share-read-only-source-policy.template.yml'
+$signingWorkflow = Read-RequiredText '.github\workflows\signpath-share-read-only.yml'
+$ciWorkflow = Read-RequiredText '.github\workflows\ci.yml'
+foreach ($schemaText in @($buildManifestSchema, $releaseManifestSchema, $testEvidenceSchema, $vmEvidenceSchema, $toolManifest)) {
+    try { $schemaText | ConvertFrom-Json | Out-Null } catch { $violations.Add("Release JSON schema does not parse: $($_.Exception.Message)") }
+}
+try { [xml]$signPathArtifact | Out-Null } catch { $violations.Add("SignPath artifact configuration does not parse: $($_.Exception.Message)") }
+
+foreach ($script in Get-ChildItem -LiteralPath (Join-Path $repoRootFull 'tools') -Filter '*.ps1' -File) {
+    $tokens = $null
+    $parseErrors = $null
+    [void][Management.Automation.Language.Parser]::ParseFile($script.FullName, [ref]$tokens, [ref]$parseErrors)
+    foreach ($parseError in @($parseErrors)) {
+        $violations.Add("PowerShell syntax error in $($script.Name): $($parseError.Message)")
     }
 }
 
-# Public/friend beta packages must compile the per-executable WER LocalDumps
-# mutation surface out. Enabling it remains an explicit developer-only build
-# choice and is never accepted by Build-Release.ps1.
-$buildProps = Get-Content -LiteralPath $buildPropsPath -Raw
-$releaseBuild = Get-Content -LiteralPath $releaseBuildPath -Raw
-$releaseVerify = Get-Content -LiteralPath $releaseVerifyPath -Raw
 foreach ($contract in @(
-        [pscustomobject]@{ Text = $buildProps; Fragment = '<PCCrashDiagnosticWerLocalDumpCapture Condition="''$(PCCrashDiagnosticWerLocalDumpCapture)'' == ''''">Disabled</PCCrashDiagnosticWerLocalDumpCapture>'; Description = 'safe default WER LocalDumps gate' },
-        [pscustomobject]@{ Text = $buildProps; Fragment = '<DefineConstants Condition="''$(PCCrashDiagnosticWerLocalDumpCapture)'' == ''Enabled''">$(DefineConstants);PCD_WER_LOCAL_DUMPS</DefineConstants>'; Description = 'explicit WER LocalDumps compile constant' },
-        [pscustomobject]@{ Text = $releaseBuild; Fragment = "`$werLocalDumpCapture = 'Disabled'"; Description = 'distributable WER LocalDumps setting' },
-        [pscustomobject]@{ Text = $releaseVerify; Fragment = '$expectedWerLocalDumpCapture = $false'; Description = 'verifier WER LocalDumps expectation' })) {
-    if (-not $contract.Text.Contains($contract.Fragment, [StringComparison]::Ordinal)) {
-        $violations.Add("$($contract.Description) is missing")
+        @($buildProps, '<PCCrashDiagnosticVersion Condition="''$(PCCrashDiagnosticVersion)'' == ''''">3.2.0-beta.1</PCCrashDiagnosticVersion>', 'fixed release version'),
+        @($buildProps, '<PCCrashDiagnosticFeatureProfile Condition="''$(PCCrashDiagnosticFeatureProfile)'' == ''''">ShareReadOnly</PCCrashDiagnosticFeatureProfile>', 'safe default profile'),
+        @($buildProps, '<PCCrashDiagnosticWerLocalDumpCapture Condition="''$(PCCrashDiagnosticWerLocalDumpCapture)'' == ''''">Disabled</PCCrashDiagnosticWerLocalDumpCapture>', 'safe WER default'),
+        @($buildProps, '<PCCrashDiagnosticRuntimeVersion Condition="''$(PCCrashDiagnosticRuntimeVersion)'' == ''''">10.0.11</PCCrashDiagnosticRuntimeVersion>', 'serviced runtime pin'),
+        @($buildProps, '''$(PCCrashDiagnosticFeatureProfile)'' == ''WerResearch'' and ''$(PCCrashDiagnosticWerLocalDumpCapture)'' == ''Enabled''', 'WER compile-time isolation'),
+        @($capabilities, 'if (capabilities.Profile == ProductFeatureProfile.ShareReadOnly && capabilities.HasAnyPrivilegedCapability)', 'ShareReadOnly invariant'),
+        @($capabilities, 'ElevatedHelper: privileged', 'capability construction'),
+        @($appManifest, 'requestedExecutionLevel level="asInvoker"', 'standard-user application manifest'),
+        @($shareFilter, 'src/PCCrashDiagnostic.App/PCCrashDiagnostic.App.csproj', 'ShareReadOnly application graph'),
+        @($buildRelease, "[ValidateSet('ShareReadOnly')][string]`$FeatureProfile = 'ShareReadOnly'", 'release profile allowlist'),
+        @($buildRelease, "`$solutionPath = Join-Path `$repoRoot 'PCCrashDiagnostic.Share.slnf'", 'release solution filter'),
+        @($buildRelease, "`$mainExecutableName = 'PCCrashDiagnostic.exe'", 'single executable identity'),
+        @($buildRelease, "`$requiredRuntimeVersion = '10.0.11'", 'release runtime pin'),
+        @($buildRelease, 'smokeMarker.RuntimeVersion', 'runtime smoke assertion'),
+        @($buildRelease, 'PrivilegedOperationsEnabled = $false', 'runtime manifest privilege gate'),
+        @($buildRelease, 'ElevatedHelperIncluded = $false', 'runtime manifest helper gate'),
+        @($buildRelease, 'WerLocalDumpCaptureEnabled = $false', 'runtime manifest WER gate'),
+        @($buildRelease, 'ManifestSchemaVersion = 3', 'release manifest schema'),
+        @($buildRelease, 'Capabilities = $capabilities', 'compiled capability manifest'),
+        @($buildRelease, "Elevation = 'None'", 'no-elevation manifest state'),
+        @($buildRelease, "Network = 'ConsentOnlyMicrosoftSymbols'", 'consent-only network manifest state'),
+        @($buildManifestSchema, '"ManifestSchemaVersion": { "const": 3 }', 'build-manifest schema 3 contract'),
+        @($releaseManifestSchema, '"ManifestSchemaVersion": { "const": 3 }', 'release-manifest schema 3 contract'),
+        @($vmEvidenceSchema, '"ReleaseManifestSha256": { "$ref": "#/$defs/sha256" }', 'VM evidence release-manifest binding'),
+        @($vmEvidenceSchema, '"Rfc3161TimestampVerified": { "const": true }', 'VM evidence RFC 3161 gate'),
+        @($signPathArtifact, '<parameter name="product-version" required="true" />', 'SignPath ProductVersion parameter'),
+        @($signPathArtifact, 'product-version="${product-version}"', 'SignPath ProductVersion restriction'),
+        @($signPathSourcePolicy, 'github-policies:', 'SignPath GitHub source-policy root'),
+        @($signPathSourcePolicy, 'require_github_hosted: true', 'SignPath GitHub-hosted runner policy'),
+        @($signPathSourcePolicy, 'disallow_reruns: true', 'SignPath rerun policy'),
+        @($signingWorkflow, 'if ($env:GITHUB_REF -cne', 'SignPath tag gate environment binding'),
+        @($signingWorkflow, 'product-version: "${{ steps.stage.outputs.product_version }}"', 'SignPath ProductVersion workflow binding'),
+        @($signingWorkflow, '-ExpectedSignerSubject $env:EXPECTED_SIGNER_SUBJECT', 'SignPath signer-subject environment binding'),
+        @($ciWorkflow, '-warnaserror:NU1901,NU1902,NU1903,NU1904', 'CI fail-closed NuGet vulnerability audit'),
+        @($ciWorkflow, './tools/Test-PublicArtifactAudit.ps1', 'CI public IL/resource audit'),
+        @($ciWorkflow, '-DependencyVulnerabilityAuditPassed $true', 'CI sanitized vulnerability-audit evidence'),
+        @($buildRelease, 'ShareApproved = $false', 'external share gate'),
+        @($buildRelease, 'authenticodePolicy.Rfc3161TimestampVerified', 'RFC 3161 signature gate'),
+        @($buildRelease, 'ExactPackageVmEvidenceVerified = $false', 'external VM gate'),
+        @($verifyRelease, "Assert-Equal 'PCCrashDiagnostic.exe' `$manifest.ExecutableName 'Executable name'", 'verifier executable identity'),
+        @($verifyRelease, 'ShareReadOnly runtime must contain exactly one executable and no elevated helper.', 'verifier helper exclusion'),
+        @($verifyRelease, "throw 'This artifact remains a candidate and is not approved for sharing.'", 'verifier share gate'),
+        @($finalizeRelease, '[string]$evidence.SignerThumbprint -cne [string]$manifest.SignerThumbprint', 'VM signer binding'),
+        @($finalizeRelease, "[string]`$evidence.TimestampAuthority -cne [string]`$manifest.TimestampSubject", 'VM timestamp-authority binding')
+    )) {
+    Require-Literal -Text $contract[0] -Literal $contract[1] -Description $contract[2]
+}
+
+if ($ExpectedFeatureProfile -ceq 'ShareReadOnly') {
+    Reject-Pattern -Text ($shareFilter + "`n" + $shareProjectGraph) `
+        -Pattern '(?i)PCCrashDiagnostic\.(?:Privileged|ElevatedHelper)|BF6CrashDiagnostic\.App' `
+        -Description 'The ShareReadOnly solution/project graph references a privileged or legacy application project.'
+    Require-Literal -Text $fullFilter -Literal 'src/PCCrashDiagnostic.Privileged/PCCrashDiagnostic.Privileged.csproj' -Description 'FullDiagnostic privileged graph'
+    Require-Literal -Text $toolManifest -Literal '"version": "4.1.5"' -Description 'pinned Microsoft SBOM Tool'
+    $capabilityBindings = [ordered]@{
+        ElevatedHelper = 'privileged'
+        SettingsApply = 'privileged'
+        SettingsRestore = 'privileged'
+        WerLocalDumps = 'wer'
+        ProtectedEvidence = 'privileged'
+        ProtectedDumpStaging = 'privileged'
+        DumpPackaging = 'privileged'
     }
-}
-if (([regex]::Matches($releaseBuild, '-p:PCCrashDiagnosticWerLocalDumpCapture=\$werLocalDumpCapture')).Count -ne 4) {
-    $violations.Add('release restore, test, helper publish, and app publish must all force the WER LocalDumps gate')
-}
-if (([regex]::Matches($releaseBuild, 'WerLocalDumpCaptureEnabled\s*=\s*\$false')).Count -ne 2) {
-    $violations.Add('both distributable manifests must record WerLocalDumpCaptureEnabled=false')
-}
-
-function Get-RepoRelativePath([string]$Path) {
-    return [IO.Path]::GetRelativePath($repoRootFull, [IO.Path]::GetFullPath($Path))
-}
-
-function Add-MissingInvariantViolation([string]$Category, [string]$Text, [string]$RequiredPattern) {
-    if ($Text -notmatch $RequiredPattern) {
-        $violations.Add($Category)
-    }
-}
-
-# v3.1 intentionally writes only fixed CrashControl values, the PagingFiles
-# value needed for exact page-file rollback, and one executable-basename child
-# under WER LocalDumps. Keep all mutation primitives in this one reviewed store;
-# additions fail closed until this scan is updated.
-$registryMutationPattern = '\.\s*(?:SetValue|CreateSubKey|DeleteSubKeyTree|DeleteSubKey|DeleteValue)\s*\('
-$managementMutationPattern = '\.\s*Put\s*\('
-foreach ($pattern in @($registryMutationPattern, $managementMutationPattern)) {
-    foreach ($match in (Select-String -LiteralPath $sourceFiles.FullName -Pattern $pattern -AllMatches)) {
-        if (-not [IO.Path]::GetFullPath($match.Path).Equals(
-                [IO.Path]::GetFullPath($configurationStorePath),
-                [StringComparison]::OrdinalIgnoreCase)) {
-            $relative = Get-RepoRelativePath $match.Path
-            $violations.Add("registry or WMI mutation outside the fixed configuration store at $relative`:$($match.LineNumber): $($match.Line.Trim())")
+    foreach ($privilegedCapability in $capabilityBindings.Keys) {
+        $binding = $capabilityBindings[$privilegedCapability]
+        if ($capabilities -notmatch "(?m)^\s*${privilegedCapability}:\s*${binding}[,);]*\s*$") {
+            $violations.Add("$privilegedCapability must derive only from its restricted profile flag")
         }
     }
+    Reject-Pattern -Text $buildRelease -Pattern '(?i)Start-Process[^\r\n]+-Verb\s+RunAs' `
+        -Description 'Build-Release.ps1 must never elevate during release construction.'
+    Reject-Pattern -Text $signingWorkflow -Pattern '\$\{\{\s*github\.ref\s*\}\}' `
+        -Description 'The signing workflow must not interpolate the selected Git ref into PowerShell source.'
 }
 
-$configurationStore = Get-Content -LiteralPath $configurationStorePath -Raw
-Add-MissingInvariantViolation 'configuration store must pin the HKLM CrashControl path' $configurationStore 'private\s+const\s+string\s+CrashControlPath\s*=\s*@"SYSTEM\\CurrentControlSet\\Control\\CrashControl"\s*;'
-Add-MissingInvariantViolation 'configuration store must pin the per-executable HKLM WER LocalDumps path' $configurationStore 'private\s+const\s+string\s+WerLocalDumpsPath\s*=\s*@"SOFTWARE\\Microsoft\\Windows\\Windows Error Reporting\\LocalDumps"\s*;'
-
-if ($configurationStore -match 'Registry\.(?:CurrentUser|ClassesRoot|Users|CurrentConfig)') {
-    $violations.Add('the crash-capture configuration store may write only through Registry.LocalMachine')
+$releaseToolText = $buildRelease + "`n" + $verifyRelease + "`n" + $finalizeRelease
+foreach ($forbidden in @(
+        @('(?i)\b(?:Invoke-WebRequest|Invoke-RestMethod|Start-BitsTransfer|curl(?:\.exe)?|wget(?:\.exe)?)\b', 'release tooling must not download inputs'),
+        @('(?i)\b(?:Set-MpPreference|DisableRealtimeMonitoring|nointegritychecks|testsigning)\b', 'release tooling must not weaken security controls'),
+        @('(?i)\b(?:sfc|dism|chkdsk|verifier)\.exe\b', 'release tooling must not invoke repair or Driver Verifier tools'),
+        @('(?i)\b(?:shutdown\.exe|Restart-Computer|Stop-Computer)\b', 'release tooling must not reboot or shut down Windows'),
+        @('(?i)\b(?:NtRaiseHardError|NotMyFault|CrashOnCtrlScroll|KeBugCheck)\b', 'release tooling must not create a deliberate crash')
+    )) {
+    Reject-Pattern -Text $releaseToolText -Pattern $forbidden[0] -Description $forbidden[1]
 }
 
-$expectedMutationCounts = [ordered]@{
-    '\.\s*Put\s*\(' = 1
-    '\.\s*CreateSubKey\s*\(' = 4
-    '\.\s*DeleteSubKey\s*\(' = 1
-    '\.\s*DeleteSubKeyTree\s*\(' = 0
-    '\.\s*DeleteValue\s*\(' = 5
-    '\.\s*SetValue\s*\(' = 4
-}
-foreach ($pattern in $expectedMutationCounts.Keys) {
-    $actual = ([regex]::Matches($configurationStore, $pattern)).Count
-    $expected = $expectedMutationCounts[$pattern]
-    if ($actual -ne $expected) {
-        $violations.Add("fixed configuration-store mutation count changed for '$pattern'; expected $expected, found $actual")
-    }
-}
-
-# The three newly counted primitives above must remain together in the fixed
-# PagingFiles restoration method. Removing that method leaves exactly the
-# previously reviewed CrashControl and per-executable WER mutation surface.
-$pagingWriterMatch = [regex]::Match(
-    $configurationStore,
-    '(?ms)^\s{4}private static void WritePagingFilesValue\(PageFileConfigurationSnapshot snapshot\)\s*\{.*?^\s{4}\}')
-if (-not $pagingWriterMatch.Success) {
-    $violations.Add('fixed PagingFiles restoration method could not be verified')
-}
-else {
-    $pagingWriter = $pagingWriterMatch.Value
-    foreach ($fragment in @(
-            '@"SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management"',
-            'memoryManagement.SetValue("PagingFiles", snapshot.PagingFiles.ToArray(), RegistryValueKind.MultiString)',
-            'memoryManagement.DeleteValue("PagingFiles", throwOnMissingValue: false)')) {
-        if (-not $pagingWriter.Contains($fragment, [StringComparison]::Ordinal)) {
-            $violations.Add("fixed PagingFiles restoration guard is missing: $fragment")
+$workflowRoot = Join-Path $repoRootFull '.github\workflows'
+if (Test-Path -LiteralPath $workflowRoot -PathType Container) {
+    foreach ($workflow in Get-ChildItem -LiteralPath $workflowRoot -Filter '*.yml' -File) {
+        $text = Get-Content -LiteralPath $workflow.FullName -Raw
+        foreach ($match in [regex]::Matches($text, '(?m)^\s*uses:\s*([^\s#]+)')) {
+            $reference = $match.Groups[1].Value
+            if ($reference -notmatch '@[0-9a-f]{40}$') {
+                $violations.Add("Workflow action is not pinned to a full commit SHA in $($workflow.Name): $reference")
+            }
         }
-    }
-
-    $pagingMutationCounts = [ordered]@{
-        '\.\s*CreateSubKey\s*\(' = 1
-        '\.\s*DeleteValue\s*\(' = 1
-        '\.\s*SetValue\s*\(' = 1
-    }
-    foreach ($pattern in $pagingMutationCounts.Keys) {
-        $actual = ([regex]::Matches($pagingWriter, $pattern)).Count
-        if ($actual -ne $pagingMutationCounts[$pattern]) {
-            $violations.Add("PagingFiles restoration mutation count changed for '$pattern'; expected $($pagingMutationCounts[$pattern]), found $actual")
-        }
-    }
-
-    $configurationWithoutPagingWriter = $configurationStore.Remove(
-        $pagingWriterMatch.Index,
-        $pagingWriterMatch.Length)
-    $priorMutationCounts = [ordered]@{
-        '\.\s*CreateSubKey\s*\(' = 3
-        '\.\s*DeleteValue\s*\(' = 4
-        '\.\s*SetValue\s*\(' = 3
-    }
-    foreach ($pattern in $priorMutationCounts.Keys) {
-        $actual = ([regex]::Matches($configurationWithoutPagingWriter, $pattern)).Count
-        if ($actual -ne $priorMutationCounts[$pattern]) {
-            $violations.Add("non-PagingFiles configuration-store mutation count changed for '$pattern'; expected $($priorMutationCounts[$pattern]), found $actual")
-        }
+        Reject-Pattern -Text $text -Pattern '(?i)\b(?:gh|github-cli)(?:\.exe)?\s+release\b|softprops/action-gh-release|ncipollo/release-action' `
+            -Description "Workflow $($workflow.Name) must not publish a GitHub release."
+        Reject-Pattern -Text $text -Pattern '(?im)^\s*(?:run:\s*)?git\s+push\b' `
+            -Description "Workflow $($workflow.Name) must not push Git state."
     }
 }
 
-$requiredConfigurationFragments = @(
-    'Registry.LocalMachine.CreateSubKey(CrashControlPath, writable: true)',
-    'Registry.LocalMachine.CreateSubKey(WerLocalDumpsPath, writable: true)',
-    'parentKey.CreateSubKey(safeName, writable: true)',
-    'parent.DeleteSubKey(safeName, throwOnMissingSubKey: false)',
-    'existing.DeleteValue("DumpType", throwOnMissingValue: false)',
-    'existing.DeleteValue("DumpCount", throwOnMissingValue: false)',
-    'existing.DeleteValue("DumpFolder", throwOnMissingValue: false)',
-    'CrashCaptureSetting.CrashDumpEnabled => ("CrashDumpEnabled", RegistryValueKind.DWord)',
-    'CrashCaptureSetting.FilterPages => ("FilterPages", RegistryValueKind.DWord)',
-    'CrashCaptureSetting.DumpFile => ("DumpFile", RegistryValueKind.ExpandString)',
-    'CrashCaptureSetting.MinidumpDirectory => ("MinidumpDir", RegistryValueKind.ExpandString)',
-    'CrashCaptureSetting.EventLogging => ("LogEvent", RegistryValueKind.DWord)',
-    'CrashCaptureSetting.OverwriteExistingDump => ("Overwrite", RegistryValueKind.DWord)',
-    'NormalizeExecutableName(executableName)'
-)
-foreach ($fragment in $requiredConfigurationFragments) {
-    if (-not $configurationStore.Contains($fragment, [StringComparison]::Ordinal)) {
-        $violations.Add("fixed configuration-store guard is missing: $fragment")
-    }
+if ($violations.Count -ne 0) {
+    throw ("Safety-boundary validation failed:`n - " + ($violations -join "`n - "))
 }
 
-# The mutating store interface may be called only by the one-shot helper. Main
-# app/coordinator/readiness code can instantiate the store for read-only facts.
-$writeCallPattern = '\.\s*Write(?:CrashSetting|WerSettings)\s*\('
-foreach ($match in (Select-String -LiteralPath $sourceFiles.FullName -Pattern $writeCallPattern -AllMatches)) {
-    $fullPath = [IO.Path]::GetFullPath($match.Path)
-    if (-not $fullPath.Equals([IO.Path]::GetFullPath($configurationStorePath), [StringComparison]::OrdinalIgnoreCase) -and
-        -not $fullPath.Equals([IO.Path]::GetFullPath($protectedHelperPath), [StringComparison]::OrdinalIgnoreCase)) {
-        $relative = Get-RepoRelativePath $match.Path
-        $violations.Add("crash-capture write invoked outside the fixed helper at $relative`:$($match.LineNumber): $($match.Line.Trim())")
-    }
-}
-
-$advancedModels = Get-Content -LiteralPath $advancedModelsPath -Raw
-$operationMatch = [regex]::Match(
-    $advancedModels,
-    'public\s+enum\s+ProtectedEvidenceOperation\s*\{(?<body>[^}]*)\}',
-    [Text.RegularExpressions.RegexOptions]::Singleline)
-if (-not $operationMatch.Success) {
-    $violations.Add('ProtectedEvidenceOperation enum could not be verified')
-}
-else {
-    $actualOperations = @(
-        $operationMatch.Groups['body'].Value.Split(',') |
-            ForEach-Object { ($_ -replace '//.*$', '').Trim() } |
-            Where-Object { $_ }
-    )
-    $allowedOperations = @(
-        'RetryNamedSource',
-        'CopySelectedDump',
-        'ApplyCrashCapturePlan',
-        'RestoreCrashCapturePlan',
-        'ApplyWerLocalDumpPlan',
-        'RestoreWerLocalDumpPlan'
-    )
-    foreach ($operation in $actualOperations) {
-        if ($allowedOperations -notcontains $operation) {
-            $violations.Add("unreviewed elevated-helper operation '$operation'")
-        }
-    }
-    foreach ($operation in $allowedOperations) {
-        if ($actualOperations -notcontains $operation) {
-            $violations.Add("required fixed elevated-helper operation '$operation' is missing")
-        }
-    }
-}
-
-$protectedHelper = Get-Content -LiteralPath $protectedHelperPath -Raw
-foreach ($operation in @(
-        'ApplyCrashCapturePlan',
-        'RestoreCrashCapturePlan',
-        'ApplyWerLocalDumpPlan',
-        'RestoreWerLocalDumpPlan')) {
-    $dispatchPattern = [regex]::Escape("ProtectedEvidenceOperation.$operation") +
-        '\s*=>\s*' + [regex]::Escape($operation) + '\s*\('
-    if ($protectedHelper -notmatch $dispatchPattern) {
-        $violations.Add("fixed elevated-helper dispatch is missing for $operation")
-    }
-}
-
-# Process starts remain reviewed and shell-free except for the fixed UAC helper
-# and Explorer's folder-opening UI action. The generic bounded runner has only
-# the two fixed, validated callers below.
-$allowedProcessLaunchPaths = @(
-    $desktopInteractionPath,
-    $winDbgRunnerPath,
-    $elevatedHelperClientPath,
-    $boundedRunnerPath
-) | ForEach-Object { [IO.Path]::GetFullPath($_) }
-foreach ($match in (Select-String -LiteralPath $sourceFiles.FullName -Pattern 'new\s+ProcessStartInfo\b|\bProcess\.Start\s*\(' -AllMatches)) {
-    if ($allowedProcessLaunchPaths -notcontains [IO.Path]::GetFullPath($match.Path)) {
-        $relative = Get-RepoRelativePath $match.Path
-        $violations.Add("unreviewed process-launch site at $relative`:$($match.LineNumber): $($match.Line.Trim())")
-    }
-}
-
-$allowedBoundedCallers = @($dumpQualityCollectorPath, $driverVerifierCollectorPath) |
-    ForEach-Object { [IO.Path]::GetFullPath($_) }
-foreach ($match in (Select-String -LiteralPath $sourceFiles.FullName -Pattern 'new\s+BoundedCommandRequest\s*\(' -AllMatches)) {
-    if ($allowedBoundedCallers -notcontains [IO.Path]::GetFullPath($match.Path)) {
-        $relative = Get-RepoRelativePath $match.Path
-        $violations.Add("unreviewed bounded-command caller at $relative`:$($match.LineNumber): $($match.Line.Trim())")
-    }
-}
-
-$boundedRunner = Get-Content -LiteralPath $boundedRunnerPath -Raw
-foreach ($fragment in @(
-        'UseShellExecute = false',
-        'RedirectStandardInput = true',
-        'process.StandardInput.Close()',
-        'process.Kill(entireProcessTree: true)')) {
-    if (-not $boundedRunner.Contains($fragment, [StringComparison]::Ordinal)) {
-        $violations.Add("bounded-command safety guard is missing: $fragment")
-    }
-}
-
-$driverVerifierCollector = Get-Content -LiteralPath $driverVerifierCollectorPath -Raw
-if ($driverVerifierCollector -notmatch 'new\s+BoundedCommandRequest\s*\(\s*_executablePath\s*,\s*\["/querysettings"\]') {
-    $violations.Add('Driver Verifier must be invoked only with the read-only /querysettings argument')
-}
-foreach ($fragment in @(
-        'Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "System32", "verifier.exe")',
-        'if (!_validator.IsAllowed(_executablePath))')) {
-    if (-not $driverVerifierCollector.Contains($fragment, [StringComparison]::Ordinal)) {
-        $violations.Add("Driver Verifier read-only guard is missing: $fragment")
-    }
-}
-
-foreach ($match in (Select-String -LiteralPath $sourceFiles.FullName -Pattern '(?i)["'']verifier(?:\.exe)?["'']' -AllMatches)) {
-    if (-not [IO.Path]::GetFullPath($match.Path).Equals(
-            [IO.Path]::GetFullPath($driverVerifierCollectorPath),
-            [StringComparison]::OrdinalIgnoreCase)) {
-        $relative = Get-RepoRelativePath $match.Path
-        $violations.Add("Driver Verifier referenced outside the read-only collector at $relative`:$($match.LineNumber): $($match.Line.Trim())")
-    }
-}
-
-$dumpQualityCollector = Get-Content -LiteralPath $dumpQualityCollectorPath -Raw
-foreach ($fragment in @(
-        'if (!_validator.IsAllowed(request.DumpChk))',
-        'request.DumpChk.Path',
-        '[Path.GetFullPath(request.Dump.OriginalPath)]')) {
-    if (-not $dumpQualityCollector.Contains($fragment, [StringComparison]::Ordinal)) {
-        $violations.Add("DumpChk fixed-command guard is missing: $fragment")
-    }
-}
-
-$winDbgRunner = Get-Content -LiteralPath $winDbgRunnerPath -Raw
-foreach ($fragment in @(
-        'if (!_validator.IsAllowedDebugger(request.Debugger))',
-        'if (_userTokenInspector.IsElevated())',
-        'UseShellExecute = false',
-        'RedirectStandardInput = true',
-        'startInfo.ArgumentList.Add("-sins")',
-        'startInfo.ArgumentList.Add("-z")',
-        'startInfo.ArgumentList.Add("-c")',
-        'process.StandardInput.Close()')) {
-    if (-not $winDbgRunner.Contains($fragment, [StringComparison]::Ordinal)) {
-        $violations.Add("WinDbg fixed-command guard is missing: $fragment")
-    }
-}
-
-$desktopInteraction = Get-Content -LiteralPath $desktopInteractionPath -Raw
-foreach ($fragment in @(
-        'FileName = "explorer.exe"',
-        'ArgumentList = { folderPath }',
-        'UseShellExecute = true')) {
-    if (-not $desktopInteraction.Contains($fragment, [StringComparison]::Ordinal)) {
-        $violations.Add("Explorer folder-launch guard is missing: $fragment")
-    }
-}
-
-$elevatedHelperClient = Get-Content -LiteralPath $elevatedHelperClientPath -Raw
-foreach ($fragment in @(
-        'private const string HelperFileName = "PCCrashDiagnostic.ElevatedHelper.exe"',
-        'FileName = _helperPath',
-        'Verb = "runas"',
-        'startInfo.ArgumentList.Add(ticket.RequestId)')) {
-    if (-not $elevatedHelperClient.Contains($fragment, [StringComparison]::Ordinal)) {
-        $violations.Add("fixed UAC-helper launch guard is missing: $fragment")
-    }
-}
-if (([regex]::Matches(
-            ($sourceFiles | ForEach-Object { Get-Content -LiteralPath $_.FullName -Raw }) -join "`n",
-            'Verb\s*=\s*"runas"')).Count -ne 1) {
-    $violations.Add('there must be exactly one reviewed runas launch site for the fixed elevated helper')
-}
-
-$manifest = Get-Content -LiteralPath $manifestPath -Raw
-if ($manifest -notmatch 'requestedExecutionLevel\s+level="asInvoker"\s+uiAccess="false"') {
-    $violations.Add('application manifest must request asInvoker with uiAccess=false')
-}
-if ($manifest -match 'requireAdministrator|highestAvailable|autoElevate') {
-    $violations.Add('application manifest contains an elevation request')
-}
-
-[xml]$appProject = Get-Content -LiteralPath $appProjectPath -Raw
-$properties = $appProject.Project.PropertyGroup
-$expectedProperties = [ordered]@{
-    TargetFramework = 'net10.0-windows10.0.19041.0'
-    UseWPF = 'true'
-    RuntimeIdentifier = 'win-x64'
-    SelfContained = 'true'
-    PublishSingleFile = 'true'
-    PublishTrimmed = 'false'
-}
-foreach ($propertyName in $expectedProperties.Keys) {
-    $value = [string](($properties | Where-Object { $_.$propertyName } | Select-Object -First 1).$propertyName)
-    if ($value -cne $expectedProperties[$propertyName]) {
-        $violations.Add("application project property $propertyName must be '$($expectedProperties[$propertyName])'; found '$value'")
-    }
-}
-
-$allowedPackages = @(
-    'Microsoft.NET.Test.Sdk',
-    'System.Diagnostics.PerformanceCounter',
-    'System.Management',
-    'xunit',
-    'xunit.runner.visualstudio'
-)
-foreach ($projectPath in (Get-ChildItem -LiteralPath $repoRootFull -Filter '*.csproj' -File -Recurse |
-        Where-Object { $_.FullName -notmatch '[\\/](?:bin|obj)[\\/]' } |
-        Select-Object -ExpandProperty FullName)) {
-    [xml]$project = Get-Content -LiteralPath $projectPath -Raw
-    foreach ($reference in @($project.SelectNodes("//*[local-name()='PackageReference']"))) {
-        $name = [string]$reference.GetAttribute('Include')
-        if ($allowedPackages -notcontains $name) {
-            $relative = $projectPath.Substring($repoRootFull.Length).TrimStart('\', '/')
-            $violations.Add("unapproved package reference '$name' in $relative")
-        }
-    }
-}
-
-if ($violations.Count -gt 0) {
-    throw "Safety boundary scan failed:`n- $($violations -join "`n- ")"
-}
-
-Write-Host "Safety boundary scan passed: $($sourceFiles.Count) source file(s), fixed crash-capture writes, reviewed command launches, approved dependencies, asInvoker manifest." -ForegroundColor Green
+Write-Host "Safety boundary passed for profile $ExpectedFeatureProfile." -ForegroundColor Green
+Write-Host 'This is a static source/release-policy check; it is not exact-package VM evidence.'

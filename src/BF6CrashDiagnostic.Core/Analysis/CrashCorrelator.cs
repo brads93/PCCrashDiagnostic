@@ -8,7 +8,8 @@ public sealed class CrashCorrelator
         IncidentSelection selection,
         IEnumerable<BugcheckRecord> bugchecks,
         IEnumerable<DumpCandidate> dumps,
-        DateTimeOffset? currentBootUtc = null)
+        DateTimeOffset? currentBootUtc = null,
+        BootSessionContext? bootSession = null)
     {
         ArgumentNullException.ThrowIfNull(selection);
         ArgumentNullException.ThrowIfNull(bugchecks);
@@ -23,7 +24,7 @@ public sealed class CrashCorrelator
             .Where(item => item.LastWriteUtc >= selection.WindowStartUtc &&
                            item.LastWriteUtc <= selection.WindowEndUtc &&
                            item.InspectionState == DumpInspectionState.Recognized)
-            .OrderBy(item => SameBootRank(item, selection, currentBootUtc))
+            .OrderBy(item => SameBootRank(item, selection, currentBootUtc, bootSession))
             .ThenBy(item => IncidentDumpPriority(item.Kind, selection.Candidate.Kind))
             .ThenBy(item => (item.LastWriteUtc - selection.Candidate.TimeUtc).Duration())
             .ToArray();
@@ -117,8 +118,27 @@ public sealed class CrashCorrelator
     private static int SameBootRank(
         DumpCandidate item,
         IncidentSelection selection,
-        DateTimeOffset? bootUtc) =>
-        bootUtc is not null && selection.Candidate.TimeUtc >= bootUtc && item.LastWriteUtc >= bootUtc ? 0 : 1;
+        DateTimeOffset? bootUtc,
+        BootSessionContext? bootSession)
+    {
+        if (bootSession is
+            {
+                IncidentOccurredInSession: true,
+                StartUtc: { } historicalStart
+            })
+        {
+            return item.LastWriteUtc >= historicalStart &&
+                   (bootSession.EndUtc is null || item.LastWriteUtc < bootSession.EndUtc)
+                ? 0
+                : 2;
+        }
+
+        return bootUtc is not null &&
+               selection.Candidate.TimeUtc >= bootUtc &&
+               item.LastWriteUtc >= bootUtc
+            ? 0
+            : 1;
+    }
 
     private static string SafeFullPath(string path)
     {

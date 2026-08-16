@@ -22,7 +22,8 @@ public sealed class SummaryBuilderV3
         DumpQuality? dumpQuality = null,
         RecentChangeTimeline? recentChanges = null,
         StorageHealthSnapshot? storageHealth = null,
-        DriverVerifierState? driverVerifier = null)
+        DriverVerifierState? driverVerifier = null,
+        BootSessionContext? bootSession = null)
     {
         var text = new StringBuilder();
         text.AppendLine("PC Crash Diagnostic");
@@ -33,6 +34,10 @@ public sealed class SummaryBuilderV3
         if (incidentSelection is not null)
         {
             text.AppendLine($"Selected incident: {incidentSelection.Candidate.Title} at {incidentSelection.Candidate.TimeUtc:O}");
+            if (incidentSelection.Candidate.EvidenceOrigin != IncidentEvidenceOrigin.Unknown)
+            {
+                text.AppendLine($"Selected evidence source: {incidentSelection.Candidate.EvidenceOrigin}");
+            }
         }
 
         if (targetProfile is not null)
@@ -58,6 +63,17 @@ public sealed class SummaryBuilderV3
             {
                 text.AppendLine($"- Recommended free space: {FormatBytes(recommended)}");
             }
+        }
+
+        if (bootSession is not null)
+        {
+            text.AppendLine();
+            text.AppendLine("Boot session reconstruction");
+            text.AppendLine($"- Confidence: {bootSession.Confidence}");
+            text.AppendLine($"- Start: {(bootSession.StartUtc is { } start ? start.ToString("O", CultureInfo.InvariantCulture) : "not established")}");
+            text.AppendLine($"- End boundary: {(bootSession.EndUtc is { } end ? end.ToString("O", CultureInfo.InvariantCulture) : "not established")}");
+            text.AppendLine($"- Incident within reconstructed session: {FormatBoolean(bootSession.IncidentOccurredInSession)}");
+            text.AppendLine($"- Limitation: {bootSession.Limitation}");
         }
 
         text.AppendLine();
@@ -123,6 +139,13 @@ public sealed class SummaryBuilderV3
         {
             text.AppendLine();
             text.AppendLine($"WinDbg reported: {debuggerAnalysis.State}");
+            if (!string.IsNullOrWhiteSpace(debuggerAnalysis.BugcheckCode))
+            {
+                text.AppendLine(string.IsNullOrWhiteSpace(debuggerAnalysis.BugcheckName)
+                    ? $"Stop code: {debuggerAnalysis.BugcheckCode}"
+                    : $"Stop code: {debuggerAnalysis.BugcheckCode} ({debuggerAnalysis.BugcheckName})");
+            }
+
             if (!string.IsNullOrWhiteSpace(debuggerAnalysis.FailureBucket))
             {
                 text.AppendLine($"Failure bucket: {debuggerAnalysis.FailureBucket}");

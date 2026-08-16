@@ -10,7 +10,7 @@ public sealed class EventAnalyzer
 {
     private static readonly Regex WhitespaceRegex = new(@"\s+", RegexOptions.Compiled, TimeSpan.FromSeconds(1));
     private static readonly Regex TraitsRegex = new(
-        @"(?i)Error\s+setting\s+traits\s+on\s+Provider\s*\{?(?<guid>[0-9a-f-]{36})\}?\.?\s*Error:\s*(?<code>0x[0-9a-f]{8})",
+        @"(?i)(?:Error\s+setting|Failed\s+to\s+set)\s+traits\s+on\s+Provider\s*\{?(?<guid>[0-9a-f-]{36})\}?\.?\s*Error:\s*(?<code>0x[0-9a-f]{8})",
         RegexOptions.Compiled,
         TimeSpan.FromSeconds(1));
 
@@ -56,7 +56,8 @@ public sealed class EventAnalyzer
         IReadOnlyList<ReliabilityRecord> reliability,
         IReadOnlyList<CrashArtifact> artifacts,
         IReadOnlyList<PerformanceSample> samples,
-        TargetProfile? targetProfile = null)
+        TargetProfile? targetProfile = null,
+        IncidentCandidate? selectedIncident = null)
     {
         var findings = new List<DiagnosticFinding>();
         string combinedReliability = string.Join('\n', reliability.Select(item => $"{item.SourceName} {item.ProductName} {item.Message}"));
@@ -67,6 +68,7 @@ public sealed class EventAnalyzer
         if (bugcheckAnchor is not null && IsRecordedBugcheckAnchor(bugcheckAnchor))
         {
             string dumpEvidence = string.IsNullOrWhiteSpace(bugcheckAnchor.DumpPath) ? "No dump path was recorded in the bugcheck event." : $"Windows named dump metadata for {Path.GetFileName(bugcheckAnchor.DumpPath)}.";
+            string formattedBugcheck = BugcheckCatalog.Format(bugcheckAnchor.BugCheckCode);
             findings.Add(new DiagnosticFinding(
                 "bugcheck",
                 10,
@@ -74,10 +76,29 @@ public sealed class EventAnalyzer
                 FindingConfidence.High,
                 "Blue screen",
                 "Windows bugcheck recorded",
-                "Windows recorded a bugcheck" + (string.IsNullOrWhiteSpace(bugcheckAnchor.BugCheckCode) ? "." : $" ({bugcheckAnchor.BugCheckCode}).") + " " + dumpEvidence,
+                "Windows recorded a bugcheck" + (string.IsNullOrWhiteSpace(formattedBugcheck) ? "." : $" ({formattedBugcheck}).") + " " + dumpEvidence,
                 "Windows recorded a kernel bugcheck.",
                 "This event does not identify the faulty driver or component.",
                 "Open the matching minidump in WinDbg and check the stop code and stack."));
+        }
+        else if (selectedIncident is
+                 {
+                     Kind: IncidentKind.Bugcheck,
+                     EvidenceOrigin: IncidentEvidenceOrigin.ReliabilityMonitor
+                 } &&
+                 FindReliabilityBlueScreen(reliability, selectedIncident) is { } reliabilityBlueScreen)
+        {
+            findings.Add(new DiagnosticFinding(
+                "reliability-blue-screen",
+                15,
+                FindingSeverity.Warning,
+                FindingConfidence.Medium,
+                "Reliability Monitor",
+                "Blue-screen entry in Reliability Monitor",
+                $"Reliability Monitor recorded a BlueScreen entry at {reliabilityBlueScreen.TimeUtc:O}. The collected System events did not include a matching bugcheck record with a non-zero stop code.",
+                "This supports that Windows recorded a system crash near the selected time.",
+                "This entry does not provide a verified stop code, parameters, matching dump, or root cause.",
+                "Check System-event coverage and inspect a dump whose time matches this incident."));
         }
 
         DuplicateEventGroup? whea = groups
@@ -156,6 +177,27 @@ public sealed class EventAnalyzer
                 "Repeat a similar multi-match session and check whether the same growth returns with a Windows resource warning."));
         }
 
+        DuplicateEventGroup? storage = groups.FirstOrDefault(group =>
+            StorageEventCatalog.TryClassify(group.ProviderName, group.EventId, out _));
+        if (storage is not null &&
+            StorageEventCatalog.TryClassify(storage.ProviderName, storage.EventId, out StorageEventCategory storageCategory))
+        {
+            findings.Add(FromGroup(
+                storage,
+                "storage-evidence",
+                40,
+                FindingSeverity.Warning,
+                FindingConfidence.High,
+                storageCategory == StorageEventCategory.TimeoutOrReset
+                    ? "Storage timeout or controller reset"
+                    : "Storage I/O error",
+                storageCategory == StorageEventCategory.TimeoutOrReset
+                    ? "Windows recorded a storage timeout or controller reset near the incident."
+                    : "Windows recorded a storage I/O error near the incident.",
+                "This event does not identify the failing layer or establish that a drive caused the incident.",
+                "Compare its timestamp with the selected incident and check whether the same provider and event recur."));
+        }
+
         HashSet<string> applicationFailureKeys = events
             .Where(item => IsApplicationFailureEvent(item, targetProfile))
             .Select(CreateDuplicateKey)
@@ -213,6 +255,20 @@ public sealed class EventAnalyzer
     private static CrashAnchor? TryCreateAnchor(DiagnosticEvent diagnosticEvent)
     {
         string provider = diagnosticEvent.ProviderName;
+        if (BugcheckRecordDecoder.TryDecode(diagnosticEvent, out BugcheckRecord decoded))
+        {
+            return new CrashAnchor(
+                diagnosticEvent.TimeUtc,
+                provider,
+                diagnosticEvent.EventId,
+                decoded.EvidenceSource == BugcheckEvidenceSource.WindowsErrorReporting
+                    ? "Windows bugcheck/system-error report"
+                    : "Unexpected restart with non-zero bugcheck data",
+                decoded.NormalizedCode == "Unknown" ? null : decoded.NormalizedCode,
+                decoded.OriginalDumpPath,
+                decoded.EvidenceSource == BugcheckEvidenceSource.WindowsErrorReporting ? 500 : 450);
+        }
+
         if (diagnosticEvent.EventId == 1001 &&
             (provider.Contains("SystemErrorReporting", StringComparison.OrdinalIgnoreCase) ||
              provider.Contains("BugCheck", StringComparison.OrdinalIgnoreCase) ||
@@ -332,8 +388,22 @@ public sealed class EventAnalyzer
     }
 
     private static bool IsProviderTraitsGroup(DuplicateEventGroup group) =>
-        group.ProviderName.Contains("Kernel-EventTracing", StringComparison.OrdinalIgnoreCase) &&
+        KernelEventTracingCatalog.IsProvider(group.ProviderName) &&
+        KernelEventTracingCatalog.IsProviderTraitsEvent(group.EventId) &&
         IsProviderTraitsMessage(group.Message);
+
+    private static ReliabilityRecord? FindReliabilityBlueScreen(
+        IReadOnlyList<ReliabilityRecord> reliability,
+        IncidentCandidate selectedIncident) =>
+        reliability
+            .Where(item => IsReliabilityBlueScreen(item) &&
+                           (item.TimeUtc - selectedIncident.TimeUtc).Duration() <= TimeSpan.FromMinutes(3))
+            .OrderBy(item => (item.TimeUtc - selectedIncident.TimeUtc).Duration())
+            .FirstOrDefault();
+
+    private static bool IsReliabilityBlueScreen(ReliabilityRecord record) =>
+        string.Join(' ', record.SourceName, record.ProductName, record.EventIdentifier, record.Message)
+            .Contains("BlueScreen", StringComparison.OrdinalIgnoreCase);
 
     private static bool HasRisingMemoryTrend(IReadOnlyList<PerformanceSample> samples, out string evidence)
     {

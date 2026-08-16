@@ -1,6 +1,7 @@
 using System.Buffers.Binary;
 using System.Text.Json;
 using BF6CrashDiagnostic.Core;
+using BF6CrashDiagnostic.Core.Analysis;
 using BF6CrashDiagnostic.Core.Collectors;
 using BF6CrashDiagnostic.Core.Models;
 
@@ -124,6 +125,44 @@ public sealed class DumpQualityCollectorTests
         string json = JsonSerializer.Serialize(result);
         Assert.DoesNotContain("Alice", json, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("private debugger text", json, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    [Trait("Category", "SyntheticScenario")]
+    public async Task InspectAsync_RefusesDumpChkUnlessTokenIsConfirmedStandardUser(
+        bool elevated)
+    {
+        UserTokenElevationState tokenState = elevated
+            ? UserTokenElevationState.Elevated
+            : UserTokenElevationState.Unavailable;
+        using var directory = new TestDirectory();
+        DumpCandidate candidate = await WriteMiniDumpAsync(directory.Path, directoryRva: 32);
+        var runner = new FakeCommandRunner(new BoundedCommandResult(
+            0,
+            "Finished dump check",
+            string.Empty,
+            false,
+            false,
+            false));
+        var collector = new DumpQualityCollector(
+            runner,
+            new AllowDumpChkValidator(),
+            TimeProvider.System,
+            new FixedTokenInspector(tokenState));
+
+        DumpQuality result = await collector.InspectAsync(new DumpQualityRequest(
+            candidate,
+            RunDumpChk: true,
+            new DumpChkInstallation("C:\\approved\\dumpchk.exe", "10.0.1", "Windows SDK", true, true, "Microsoft")));
+
+        Assert.Equal(DumpChkState.Rejected, result.DumpChkState);
+        Assert.Contains(
+            tokenState == UserTokenElevationState.Elevated ? "elevated" : "standard-user",
+            result.Detail,
+            StringComparison.OrdinalIgnoreCase);
+        Assert.Null(runner.Request);
     }
 
     [Beta2Fact]
@@ -355,5 +394,10 @@ public sealed class DumpQualityCollectorTests
     private sealed class AllowDumpChkValidator : IDumpChkRequestValidator
     {
         public bool IsAllowed(DumpChkInstallation installation) => true;
+    }
+
+    private sealed class FixedTokenInspector(UserTokenElevationState state) : IUserTokenInspector
+    {
+        public UserTokenElevationState GetElevationState() => state;
     }
 }

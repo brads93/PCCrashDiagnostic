@@ -1,0 +1,218 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pc-crash-diagnostic.invalid/schemas/release-manifest-v3.json",
+  "title": "PC Crash Diagnostic release manifest schema 3",
+  "type": "object",
+  "required": [
+    "ManifestSchemaVersion",
+    "Product",
+    "Version",
+    "FeatureProfile",
+    "CandidateState",
+    "ShareApproved",
+    "ShareApprovalBlockers",
+    "PrivilegedOperationsEnabled",
+    "ElevatedHelperIncluded",
+    "WerLocalDumpCaptureEnabled",
+    "Capabilities",
+    "Elevation",
+    "SettingsMutation",
+    "ProtectedEvidence",
+    "Network",
+    "Helper",
+    "Configuration",
+    "BuiltUtc",
+    "TargetFramework",
+    "RuntimeIdentifier",
+    "DotNetSdkVersion",
+    "RuntimeFrameworkVersion",
+    "SourceRepository",
+    "SourceOriginVerified",
+    "SourceTag",
+    "SourceTagVerified",
+    "SourceCommit",
+    "SourceTree",
+    "SourceTreeState",
+    "ExecutableName",
+    "ExecutableSha256",
+    "AuthenticodeStatus",
+    "SignerSubject",
+    "SignerIssuer",
+    "SignerThumbprint",
+    "TimestampSubject",
+    "TimestampIssuer",
+    "UnsignedSigningInputSha256",
+    "SigningInputArtifactId",
+    "TimestampCertificatePresent",
+    "ReproducibleBuildVerified",
+    "ReproducibilityPeerSha256",
+    "Rfc3161TimestampVerified",
+    "ExactPackageVmEvidenceVerified",
+    "TestsExecuted",
+    "RuntimePackageFiles",
+    "Evidence",
+    "Assets"
+  ],
+  "properties": {
+    "ManifestSchemaVersion": { "const": 3 },
+    "Product": { "const": "PC Crash Diagnostic" },
+    "Version": { "const": "3.2.0-beta.1" },
+    "FeatureProfile": { "const": "ShareReadOnly" },
+    "CandidateState": {
+      "enum": [
+        "UnsignedCandidate",
+        "UnsignedDirtyLocalCandidate",
+        "SignedAwaitingExactPackageVmEvidence",
+        "ApprovedForSharing"
+      ]
+    },
+    "ShareApproved": { "type": "boolean" },
+    "ShareApprovalBlockers": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "PrivilegedOperationsEnabled": { "const": false },
+    "ElevatedHelperIncluded": { "const": false },
+    "WerLocalDumpCaptureEnabled": { "const": false },
+    "Capabilities": { "$ref": "#/$defs/capabilities" },
+    "Elevation": { "const": "None" },
+    "SettingsMutation": { "const": "None" },
+    "ProtectedEvidence": { "const": "None" },
+    "Network": { "const": "ConsentOnlyMicrosoftSymbols" },
+    "Helper": { "const": "Absent" },
+    "Configuration": { "const": "Release" },
+    "BuiltUtc": { "type": "string", "format": "date-time" },
+    "TargetFramework": { "const": "net10.0-windows10.0.19041.0" },
+    "RuntimeIdentifier": { "const": "win-x64" },
+    "DotNetSdkVersion": { "const": "10.0.400" },
+    "RuntimeFrameworkVersion": { "const": "10.0.11" },
+    "SourceRepository": { "const": "https://github.com/brads93/PCCrashDiagnostic" },
+    "SourceOriginVerified": { "type": "boolean" },
+    "SourceTag": { "type": ["string", "null"], "pattern": "^v3\\.2\\.0-beta\\.1$" },
+    "SourceTagVerified": { "type": "boolean" },
+    "SourceCommit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "SourceTree": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "SourceTreeState": { "enum": ["clean", "dirty"] },
+    "ExecutableName": { "const": "PCCrashDiagnostic.exe" },
+    "ExecutableSha256": { "$ref": "#/$defs/sha256" },
+    "AuthenticodeStatus": { "type": "string", "minLength": 1 },
+    "SignerSubject": { "type": ["string", "null"] },
+    "SignerIssuer": { "type": ["string", "null"] },
+    "SignerThumbprint": { "type": ["string", "null"], "pattern": "^[0-9A-F]{40}$" },
+    "TimestampSubject": { "type": ["string", "null"] },
+    "TimestampIssuer": { "type": ["string", "null"] },
+    "UnsignedSigningInputSha256": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$" },
+    "SigningInputArtifactId": { "type": ["string", "null"], "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+    "TimestampCertificatePresent": { "type": "boolean" },
+    "ReproducibleBuildVerified": { "type": "boolean" },
+    "ReproducibilityPeerSha256": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$" },
+    "Rfc3161TimestampVerified": { "type": "boolean" },
+    "ExactPackageVmEvidenceVerified": { "type": "boolean" },
+    "ApprovedUtc": { "type": "string", "format": "date-time" },
+    "ExactPackageVmEvidence": {
+      "type": "object",
+      "required": ["EvidenceArtifactId", "EvidenceSha256", "RuntimeZipSha256", "ReviewedUtc"],
+      "properties": {
+        "EvidenceArtifactId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+        "EvidenceSha256": { "$ref": "#/$defs/sha256" },
+        "RuntimeZipSha256": { "$ref": "#/$defs/sha256" },
+        "ReviewedUtc": { "type": "string", "format": "date-time" }
+      },
+      "additionalProperties": false
+    },
+    "TestsExecuted": { "const": true },
+    "RuntimePackageFiles": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/file" }
+    },
+    "Evidence": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "type": "object",
+        "required": ["Name", "Sha256"],
+        "properties": {
+          "Name": { "enum": ["TestEvidence.json", "SBOM.spdx.json", "Provenance.intoto.json"] },
+          "Sha256": { "$ref": "#/$defs/sha256" },
+          "Attested": { "type": "boolean" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "Assets": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "type": "object",
+        "required": ["Role", "Name", "Size", "Sha256"],
+        "properties": {
+          "Role": { "enum": ["runtime-candidate", "source"] },
+          "Name": { "type": "string", "minLength": 1 },
+          "Size": { "type": "integer", "minimum": 1 },
+          "Sha256": { "$ref": "#/$defs/sha256" }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "CandidateState": { "enum": ["SignedAwaitingExactPackageVmEvidence", "ApprovedForSharing"] } }, "required": ["CandidateState"] },
+      "then": {
+        "required": ["UnsignedSigningInputSha256", "SigningInputArtifactId"],
+        "properties": {
+          "UnsignedSigningInputSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "SigningInputArtifactId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "ShareApproved": { "const": true } }, "required": ["ShareApproved"] },
+      "then": {
+        "required": ["ApprovedUtc", "ExactPackageVmEvidence"],
+        "properties": {
+          "CandidateState": { "const": "ApprovedForSharing" },
+          "AuthenticodeStatus": { "const": "Valid" },
+          "TimestampCertificatePresent": { "const": true },
+          "Rfc3161TimestampVerified": { "const": true },
+          "ExactPackageVmEvidenceVerified": { "const": true },
+          "ShareApprovalBlockers": { "maxItems": 0 }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "CandidateState": { "const": "ApprovedForSharing" } }, "required": ["CandidateState"] },
+      "then": { "properties": { "ShareApproved": { "const": true } } }
+    }
+  ],
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "capabilities": {
+      "type": "object",
+      "required": ["Profile", "StandardEvidence", "TargetMonitoring", "CrashReadinessReadOnly", "AccessibleDumpMetadata", "LocalHistory", "SafeSummaryExport", "TechnicalReportExport", "RecycleBinDeletion", "DumpChk", "WinDbg", "MicrosoftSymbolsAfterConsent", "ElevatedHelper", "SettingsApply", "SettingsRestore", "WerLocalDumps", "ProtectedEvidence", "ProtectedDumpStaging", "DumpPackaging"],
+      "properties": {
+        "Profile": { "const": "ShareReadOnly" },
+        "StandardEvidence": { "const": true }, "TargetMonitoring": { "const": true },
+        "CrashReadinessReadOnly": { "const": true }, "AccessibleDumpMetadata": { "const": true },
+        "LocalHistory": { "const": true }, "SafeSummaryExport": { "const": true },
+        "TechnicalReportExport": { "const": true }, "RecycleBinDeletion": { "const": true },
+        "DumpChk": { "const": true }, "WinDbg": { "const": true },
+        "MicrosoftSymbolsAfterConsent": { "const": true }, "ElevatedHelper": { "const": false },
+        "SettingsApply": { "const": false }, "SettingsRestore": { "const": false },
+        "WerLocalDumps": { "const": false }, "ProtectedEvidence": { "const": false },
+        "ProtectedDumpStaging": { "const": false }, "DumpPackaging": { "const": false }
+      },
+      "additionalProperties": false
+    },
+    "file": {
+      "type": "object",
+      "required": ["Path", "Size", "Sha256"],
+      "properties": {
+        "Path": { "type": "string", "minLength": 1, "pattern": "^(?!/)(?!.*\\.\\./)(?!.*:).+$" },
+        "Size": { "type": "integer", "minimum": 0 },
+        "Sha256": { "$ref": "#/$defs/sha256" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

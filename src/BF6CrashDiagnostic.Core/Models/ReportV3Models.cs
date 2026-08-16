@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using BF6CrashDiagnostic.Core.Analysis;
 
 namespace BF6CrashDiagnostic.Core.Models;
 
@@ -57,13 +58,28 @@ public sealed record DebuggerAnalysis(
     string Limitation,
     [property: JsonIgnore]
     string? LocalRawLogPath = null,
-    DebuggerBlackboxSummary? Blackbox = null);
+    DebuggerBlackboxSummary? Blackbox = null,
+    string? BugcheckName = null);
 
 public sealed record SourceCoverage(
     string Source,
     CollectionState State,
     int RecordCount,
     string Detail);
+
+public enum WheaEvidenceCategory
+{
+    Processor,
+    Memory,
+    PCIe,
+    Generic
+}
+
+public sealed record WheaEvidence(
+    int EventId,
+    WheaEventClassification Classification,
+    WheaEvidenceCategory Category,
+    int Count);
 
 public sealed record DiagnosticReportV3(
     int ReportSchemaVersion,
@@ -97,7 +113,9 @@ public sealed record DiagnosticReportV3(
     DumpQuality? DumpQuality = null,
     RecentChangeTimeline? RecentChanges = null,
     StorageHealthSnapshot? StorageHealth = null,
-    DriverVerifierState? DriverVerifier = null);
+    DriverVerifierState? DriverVerifier = null,
+    BootSessionContext? BootSession = null,
+    IReadOnlyList<WheaEvidence>? WheaEvidence = null);
 
 public sealed record ReportPackageV3(
     DiagnosticReportV3 Report,

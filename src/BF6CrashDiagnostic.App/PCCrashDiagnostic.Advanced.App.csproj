@@ -12,16 +12,20 @@
     <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
     <PublishTrimmed>false</PublishTrimmed>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <AssemblyName>PCCrashDiagnostic</AssemblyName>
+    <AssemblyName>PCCrashDiagnostic.Advanced</AssemblyName>
     <RootNamespace>BF6CrashDiagnostic.App</RootNamespace>
-    <AssemblyTitle>PC Crash Diagnostic</AssemblyTitle>
+    <AssemblyTitle>PC Crash Diagnostic Advanced</AssemblyTitle>
     <Product>PC Crash Diagnostic</Product>
-    <Description>Local Windows crash and blue-screen evidence collector.</Description>
+    <Description>Internal Windows crash diagnostic build with privileged workflows.</Description>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\BF6CrashDiagnostic.Core\BF6CrashDiagnostic.Core.csproj" />
+    <ProjectReference Include="..\PCCrashDiagnostic.Privileged\PCCrashDiagnostic.Privileged.csproj" />
     <AssemblyMetadata Include="PCCrashDiagnostic.ExpectedElevatedHelperSha256"
                       Value="$(ExpectedElevatedHelperSha256)"
                       Condition="'$(ExpectedElevatedHelperSha256)' != ''" />
   </ItemGroup>
+  <Target Name="ValidateInternalAdvancedApplicationProfile" BeforeTargets="PrepareForBuild">
+    <Error Condition="'$(PCCrashDiagnosticFeatureProfile)' != 'FullDiagnostic' and '$(PCCrashDiagnosticFeatureProfile)' != 'WerResearch'"
+           Text="PCCrashDiagnostic.Advanced.App is internal-only and requires FullDiagnostic or WerResearch." />
+  </Target>
 </Project>

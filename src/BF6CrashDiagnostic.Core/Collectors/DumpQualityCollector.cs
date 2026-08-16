@@ -13,16 +13,26 @@ namespace BF6CrashDiagnostic.Core.Collectors;
 /// Microsoft SDK DumpChk executable. DumpChk output is interpreted locally and is
 /// never retained in the result.
 /// </summary>
-public sealed class DumpQualityCollector
+#if PCD_SHARE_READ_ONLY
+internal
+#else
+public
+#endif
+sealed class DumpQualityCollector
 {
     private const int HeaderLength = 32;
     private const uint MaximumMiniDumpStreams = 4_096;
     private readonly IBoundedCommandRunner _runner;
     private readonly IDumpChkRequestValidator _validator;
     private readonly TimeProvider _timeProvider;
+    private readonly IUserTokenInspector _userTokenInspector;
 
     public DumpQualityCollector()
-        : this(new BoundedCommandRunner(), new DumpChkRequestValidator(), TimeProvider.System)
+        : this(
+            new BoundedCommandRunner(),
+            new DumpChkRequestValidator(),
+            TimeProvider.System,
+            new UserTokenInspector())
     {
     }
 
@@ -30,10 +40,20 @@ public sealed class DumpQualityCollector
         IBoundedCommandRunner runner,
         IDumpChkRequestValidator validator,
         TimeProvider timeProvider)
+        : this(runner, validator, timeProvider, new UserTokenInspector())
+    {
+    }
+
+    internal DumpQualityCollector(
+        IBoundedCommandRunner runner,
+        IDumpChkRequestValidator validator,
+        TimeProvider timeProvider,
+        IUserTokenInspector userTokenInspector)
     {
         _runner = runner;
         _validator = validator;
         _timeProvider = timeProvider;
+        _userTokenInspector = userTokenInspector;
     }
 
     public async Task<DumpQuality> InspectAsync(
@@ -86,6 +106,18 @@ public sealed class DumpQualityCollector
             {
                 DumpChkState = DumpChkState.Error,
                 Detail = internalResult.Detail + " DumpChk was not started because the bounded checks did not produce a safely readable dump."
+            };
+        }
+
+        UserTokenElevationState tokenState = _userTokenInspector.GetElevationState();
+        if (tokenState != UserTokenElevationState.StandardUser)
+        {
+            return internalResult with
+            {
+                DumpChkState = DumpChkState.Rejected,
+                Detail = internalResult.Detail + (tokenState == UserTokenElevationState.Elevated
+                    ? " DumpChk was not started because this process is elevated. Restart the app normally and try again."
+                    : " DumpChk was not started because Windows could not verify a standard-user process token.")
             };
         }
 

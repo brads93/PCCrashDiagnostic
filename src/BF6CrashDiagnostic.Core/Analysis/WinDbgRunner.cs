@@ -3,12 +3,16 @@ using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using BF6CrashDiagnostic.Core.Models;
-using BF6CrashDiagnostic.Core.Reporting;
 using Microsoft.Win32.SafeHandles;
 
 namespace BF6CrashDiagnostic.Core.Analysis;
 
-public sealed class WinDbgRunner
+#if PCD_SHARE_READ_ONLY
+internal
+#else
+public
+#endif
+sealed class WinDbgRunner
 {
     private const string MicrosoftSymbolServer = "https://msdl.microsoft.com/download/symbols";
     private readonly IDebuggerProcessHost _processHost;
@@ -49,13 +53,16 @@ public sealed class WinDbgRunner
                 "Debugger analysis is unavailable while the protected target is running.");
         }
 
-        if (_userTokenInspector.IsElevated())
+        UserTokenElevationState tokenState = _userTokenInspector.GetElevationState();
+        if (tokenState != UserTokenElevationState.StandardUser)
         {
             return Empty(
                 DebuggerAnalysisState.Failed,
                 startedUtc,
                 request,
-                "WinDbg is never run from an elevated process. Restart the app normally and try again.");
+                tokenState == UserTokenElevationState.Elevated
+                    ? "WinDbg is never run from an elevated process. Restart the app normally and try again."
+                    : "WinDbg was not started because Windows could not verify a standard-user process token.");
         }
 
         if (!_validator.IsAllowedDebugger(request.Debugger))
@@ -82,7 +89,7 @@ public sealed class WinDbgRunner
             throw new ArgumentOutOfRangeException(nameof(request), "The debugger timeout must be between 5 seconds and 10 minutes.");
         }
 
-        (string dumpPath, DumpArtifactIdentity approvedIdentity) = ValidateDump(request.Dump);
+        (string dumpPath, LocalFileIdentity approvedIdentity) = ValidateDump(request.Dump);
         string symbolCache = ValidateAndCreatePrivateDirectory(request.SymbolCachePath);
         string rawLogDirectory = ValidateAndCreatePrivateDirectory(request.RawLogDirectory);
         cancellationToken.ThrowIfCancellationRequested();
@@ -94,14 +101,12 @@ public sealed class WinDbgRunner
             FileShare.Read,
             128 * 1024,
             FileOptions.Asynchronous | FileOptions.SequentialScan);
-        DumpArtifactIdentity openedIdentity = DumpPackager.CaptureIdentity(
+        LocalFileIdentity openedIdentity = LocalFileIdentityCapture.CaptureOpened(
             dumpPath,
+            stableDump,
             approvedIdentity.SizeBytes,
-            approvedIdentity.LastWriteTimeUtc);
-        if (!string.Equals(
-                approvedIdentity.FileIdentityHash,
-                openedIdentity.FileIdentityHash,
-                StringComparison.Ordinal))
+            new DateTimeOffset(approvedIdentity.LastWriteTimeUtc, TimeSpan.Zero));
+        if (!LocalFileIdentityCapture.IsSameFile(approvedIdentity, openedIdentity))
         {
             throw new IOException("The selected dump changed before debugger launch.");
         }
@@ -257,10 +262,13 @@ public sealed class WinDbgRunner
                     parsed.BlackboxAvailable,
                     parsed.BlackboxBootStatus,
                     parsed.BlackboxServiceControlRequests)
+                : null,
+            BugcheckCatalog.TryGetName(parsed.BugcheckCode, out string bugcheckName)
+                ? bugcheckName
                 : null);
     }
 
-    private static (string Path, DumpArtifactIdentity Identity) ValidateDump(DumpCandidate dump)
+    private static (string Path, LocalFileIdentity Identity) ValidateDump(DumpCandidate dump)
     {
         if (string.IsNullOrWhiteSpace(dump.OriginalPath) ||
             dump.InspectionState != DumpInspectionState.Recognized ||
@@ -270,7 +278,7 @@ public sealed class WinDbgRunner
         }
 
         string fullPath = Path.GetFullPath(dump.OriginalPath);
-        DumpArtifactIdentity identity = DumpPackager.CaptureIdentity(fullPath, dump.SizeBytes, dump.LastWriteUtc);
+        LocalFileIdentity identity = LocalFileIdentityCapture.Capture(fullPath, dump.SizeBytes, dump.LastWriteUtc);
         return (fullPath, identity);
     }
 
@@ -347,7 +355,14 @@ internal interface IDebuggerRequestValidator
 
 internal interface IUserTokenInspector
 {
-    bool IsElevated();
+    UserTokenElevationState GetElevationState();
+}
+
+internal enum UserTokenElevationState
+{
+    StandardUser,
+    Elevated,
+    Unavailable
 }
 
 internal sealed class DebuggerRequestValidator : IDebuggerRequestValidator
@@ -422,18 +437,25 @@ internal static class CdbPathPolicy
 
 internal sealed class UserTokenInspector : IUserTokenInspector
 {
-    public bool IsElevated()
+    public UserTokenElevationState GetElevationState()
     {
         if (!OpenProcessToken(Process.GetCurrentProcess().Handle, 0x0008, out SafeFileHandle token))
         {
-            throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
+            return UserTokenElevationState.Unavailable;
         }
 
         using (token)
         {
             int elevation = 0;
             int returned;
-            return GetTokenInformation(token, 20, ref elevation, sizeof(int), out returned) && elevation != 0;
+            if (!GetTokenInformation(token, 20, ref elevation, sizeof(int), out returned) || returned < sizeof(int))
+            {
+                return UserTokenElevationState.Unavailable;
+            }
+
+            return elevation == 0
+                ? UserTokenElevationState.StandardUser
+                : UserTokenElevationState.Elevated;
         }
     }
 
@@ -484,7 +506,6 @@ internal sealed class DebuggerProcessHost : IDebuggerProcessHost
             throw new InvalidOperationException("cdb.exe did not start.");
         }
 
-        process.StandardInput.Close();
         try
         {
             job.Assign(process);
@@ -494,6 +515,8 @@ internal sealed class DebuggerProcessHost : IDebuggerProcessHost
             TryKill(process);
             throw;
         }
+
+        process.StandardInput.Close();
 
         // The host owns cancellation and kills the contained process tree. Keep
         // draining both redirected pipes until they close so cdb cannot block on
@@ -572,155 +595,6 @@ internal sealed class DebuggerProcessHost : IDebuggerProcessHost
         catch (System.ComponentModel.Win32Exception)
         {
         }
-    }
-}
-
-internal sealed record BoundedTextReadResult(string Text, bool Truncated);
-
-internal static class BoundedTextStreamReader
-{
-    private const int BufferSize = 16 * 1024;
-
-    public static async Task<BoundedTextReadResult> ReadAndDrainAsync(
-        TextReader reader,
-        int maxCharacters,
-        CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(reader);
-        ArgumentOutOfRangeException.ThrowIfNegative(maxCharacters);
-
-        var captured = new StringBuilder(Math.Min(maxCharacters, BufferSize));
-        char[] buffer = new char[BufferSize];
-        bool truncated = false;
-
-        while (true)
-        {
-            int read = await reader.ReadAsync(buffer.AsMemory(), cancellationToken).ConfigureAwait(false);
-            if (read == 0)
-            {
-                break;
-            }
-
-            int remaining = maxCharacters - captured.Length;
-            if (remaining > 0)
-            {
-                int retained = Math.Min(remaining, read);
-                captured.Append(buffer, 0, retained);
-                truncated |= retained < read;
-            }
-            else
-            {
-                truncated = true;
-            }
-        }
-
-        return new BoundedTextReadResult(captured.ToString(), truncated);
-    }
-}
-
-internal sealed class KillOnCloseJob : IDisposable
-{
-    private const uint JobObjectLimitKillOnJobClose = 0x00002000;
-    private readonly SafeJobHandle _handle;
-
-    public KillOnCloseJob()
-    {
-        _handle = CreateJobObject(IntPtr.Zero, null);
-        if (_handle.IsInvalid)
-        {
-            throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
-        }
-
-        var information = new JobObjectExtendedLimitInformation
-        {
-            BasicLimitInformation = new JobObjectBasicLimitInformation
-            {
-                LimitFlags = JobObjectLimitKillOnJobClose
-            }
-        };
-        if (!SetInformationJobObject(
-                _handle,
-                9,
-                ref information,
-                (uint)Marshal.SizeOf<JobObjectExtendedLimitInformation>()))
-        {
-            throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
-        }
-    }
-
-    public void Assign(Process process)
-    {
-        if (!AssignProcessToJobObject(_handle, process.Handle))
-        {
-            throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
-        }
-    }
-
-    public void Dispose() => _handle.Dispose();
-
-    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-    private static extern SafeJobHandle CreateJobObject(IntPtr jobAttributes, string? name);
-
-    [DllImport("kernel32.dll", SetLastError = true)]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool SetInformationJobObject(
-        SafeJobHandle job,
-        int informationClass,
-        ref JobObjectExtendedLimitInformation information,
-        uint informationLength);
-
-    [DllImport("kernel32.dll", SetLastError = true)]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool AssignProcessToJobObject(SafeJobHandle job, IntPtr process);
-
-    private sealed class SafeJobHandle : SafeHandleZeroOrMinusOneIsInvalid
-    {
-        private SafeJobHandle()
-            : base(true)
-        {
-        }
-
-        protected override bool ReleaseHandle() => CloseHandle(handle);
-
-        [DllImport("kernel32.dll")]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        private static extern bool CloseHandle(IntPtr handle);
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct JobObjectBasicLimitInformation
-    {
-        public long PerProcessUserTimeLimit;
-        public long PerJobUserTimeLimit;
-        public uint LimitFlags;
-        public UIntPtr MinimumWorkingSetSize;
-        public UIntPtr MaximumWorkingSetSize;
-        public uint ActiveProcessLimit;
-        public UIntPtr Affinity;
-        public uint PriorityClass;
-        public uint SchedulingClass;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct IoCounters
-    {
-        public ulong ReadOperationCount;
-        public ulong WriteOperationCount;
-        public ulong OtherOperationCount;
-        public ulong ReadTransferCount;
-        public ulong WriteTransferCount;
-        public ulong OtherTransferCount;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct JobObjectExtendedLimitInformation
-    {
-        public JobObjectBasicLimitInformation BasicLimitInformation;
-        public IoCounters IoInfo;
-        public UIntPtr ProcessMemoryLimit;
-        public UIntPtr JobMemoryLimit;
-        public UIntPtr PeakProcessMemoryUsed;
-        public UIntPtr PeakJobMemoryUsed;
     }
 }
 

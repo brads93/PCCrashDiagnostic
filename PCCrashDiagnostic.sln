@@ -2,15 +2,23 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PCCrashDiagnostic.Core", "src\BF6CrashDiagnostic.Core\BF6CrashDiagnostic.Core.csproj", "{7A73EF40-37BA-43AF-A0A5-C164AA0E8250}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PCCrashDiagnostic.Privileged", "src\PCCrashDiagnostic.Privileged\PCCrashDiagnostic.Privileged.csproj", "{7A73EF40-37BA-43AF-A0A5-C164AA0E8250}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PCCrashDiagnostic.App", "src\BF6CrashDiagnostic.App\BF6CrashDiagnostic.App.csproj", "{75462B4C-3308-4F6E-9693-A4DBF1BDBAD8}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PCCrashDiagnostic.Advanced.App", "src\BF6CrashDiagnostic.App\PCCrashDiagnostic.Advanced.App.csproj", "{75462B4C-3308-4F6E-9693-A4DBF1BDBAD8}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PCCrashDiagnostic.Tests", "tests\BF6CrashDiagnostic.Tests\BF6CrashDiagnostic.Tests.csproj", "{5D3B5072-3B58-4BA8-9D13-23DB7095023B}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PCCrashDiagnostic.ElevatedHelper", "src\PCCrashDiagnostic.ElevatedHelper\PCCrashDiagnostic.ElevatedHelper.csproj", "{B90C5DF7-9234-4FBC-9739-72FFEB7E0C05}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PCCrashDiagnostic.Contracts", "src\PCCrashDiagnostic.Contracts\PCCrashDiagnostic.Contracts.csproj", "{BA01F8C6-7C4F-48B0-A0E8-6F5B65722632}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PCCrashDiagnostic.Core", "src\PCCrashDiagnostic.Core\PCCrashDiagnostic.Core.csproj", "{2C23F715-AD1F-4EB0-9AA8-2D1F513B7BB7}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PCCrashDiagnostic.LocalTools", "src\PCCrashDiagnostic.LocalTools\PCCrashDiagnostic.LocalTools.csproj", "{2FF033B2-4DB2-4E1B-8106-4F3BAF713E09}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PCCrashDiagnostic.Share.Tests", "tests\PCCrashDiagnostic.Share.Tests\PCCrashDiagnostic.Share.Tests.csproj", "{A825E620-46D5-4D29-9617-E7EE3B8F9A86}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PCCrashDiagnostic.App", "src\PCCrashDiagnostic.App\PCCrashDiagnostic.App.csproj", "{D768B8D8-EE3C-4190-8632-C2B2183A4EF7}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -38,5 +46,21 @@ Global
 		{BA01F8C6-7C4F-48B0-A0E8-6F5B65722632}.Debug|x64.Build.0 = Debug|Any CPU
 		{BA01F8C6-7C4F-48B0-A0E8-6F5B65722632}.Release|x64.ActiveCfg = Release|Any CPU
 		{BA01F8C6-7C4F-48B0-A0E8-6F5B65722632}.Release|x64.Build.0 = Release|Any CPU
+		{2C23F715-AD1F-4EB0-9AA8-2D1F513B7BB7}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{2C23F715-AD1F-4EB0-9AA8-2D1F513B7BB7}.Debug|x64.Build.0 = Debug|Any CPU
+		{2C23F715-AD1F-4EB0-9AA8-2D1F513B7BB7}.Release|x64.ActiveCfg = Release|Any CPU
+		{2C23F715-AD1F-4EB0-9AA8-2D1F513B7BB7}.Release|x64.Build.0 = Release|Any CPU
+		{2FF033B2-4DB2-4E1B-8106-4F3BAF713E09}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{2FF033B2-4DB2-4E1B-8106-4F3BAF713E09}.Debug|x64.Build.0 = Debug|Any CPU
+		{2FF033B2-4DB2-4E1B-8106-4F3BAF713E09}.Release|x64.ActiveCfg = Release|Any CPU
+		{2FF033B2-4DB2-4E1B-8106-4F3BAF713E09}.Release|x64.Build.0 = Release|Any CPU
+		{A825E620-46D5-4D29-9617-E7EE3B8F9A86}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{A825E620-46D5-4D29-9617-E7EE3B8F9A86}.Debug|x64.Build.0 = Debug|Any CPU
+		{A825E620-46D5-4D29-9617-E7EE3B8F9A86}.Release|x64.ActiveCfg = Release|Any CPU
+		{A825E620-46D5-4D29-9617-E7EE3B8F9A86}.Release|x64.Build.0 = Release|Any CPU
+		{D768B8D8-EE3C-4190-8632-C2B2183A4EF7}.Debug|x64.ActiveCfg = Debug|x64
+		{D768B8D8-EE3C-4190-8632-C2B2183A4EF7}.Debug|x64.Build.0 = Debug|x64
+		{D768B8D8-EE3C-4190-8632-C2B2183A4EF7}.Release|x64.ActiveCfg = Release|x64
+		{D768B8D8-EE3C-4190-8632-C2B2183A4EF7}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 EndGlobal

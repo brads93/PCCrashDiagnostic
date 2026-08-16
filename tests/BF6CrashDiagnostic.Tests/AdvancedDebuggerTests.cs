@@ -334,6 +334,24 @@ public sealed class AdvancedDebuggerTests
 
     [Fact]
     [Trait("Category", "SyntheticScenario")]
+    public async Task Runner_RefusesToRunWhenStandardUserTokenCannotBeVerified()
+    {
+        using var directory = new TestDirectory();
+        DumpCandidate dump = await CreateDumpCandidateAsync(directory.Path);
+        var host = new FakeProcessHost(new DebuggerProcessResult(0, string.Empty, string.Empty, false, false, false));
+        var runner = new WinDbgRunner(host, new AllowDebuggerValidator(), new UnavailableTokenInspector());
+
+        DebuggerAnalysis result = await runner.AnalyzeAsync(
+            Request(directory.Path, dump, SymbolAccessMode.LocalOnly, consent: false),
+            CancellationToken.None);
+
+        Assert.Equal(DebuggerAnalysisState.Failed, result.State);
+        Assert.Contains("could not verify", result.Limitation, StringComparison.OrdinalIgnoreCase);
+        Assert.Null(host.Invocation);
+    }
+
+    [Fact]
+    [Trait("Category", "SyntheticScenario")]
     public async Task Runner_MapsTimeoutAndKeepsPartialFieldsInformational()
     {
         using var directory = new TestDirectory();
@@ -482,11 +500,16 @@ public sealed class AdvancedDebuggerTests
 
     private sealed class StandardTokenInspector : IUserTokenInspector
     {
-        public bool IsElevated() => false;
+        public UserTokenElevationState GetElevationState() => UserTokenElevationState.StandardUser;
     }
 
     private sealed class ElevatedTokenInspector : IUserTokenInspector
     {
-        public bool IsElevated() => true;
+        public UserTokenElevationState GetElevationState() => UserTokenElevationState.Elevated;
+    }
+
+    private sealed class UnavailableTokenInspector : IUserTokenInspector
+    {
+        public UserTokenElevationState GetElevationState() => UserTokenElevationState.Unavailable;
     }
 }

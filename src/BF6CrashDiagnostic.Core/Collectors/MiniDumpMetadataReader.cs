@@ -1,7 +1,7 @@
 using System.IO.MemoryMappedFiles;
 using System.Runtime.InteropServices;
+using BF6CrashDiagnostic.Core.Analysis;
 using BF6CrashDiagnostic.Core.Models;
-using BF6CrashDiagnostic.Core.Reporting;
 
 namespace BF6CrashDiagnostic.Core.Collectors;
 
@@ -10,7 +10,12 @@ namespace BF6CrashDiagnostic.Core.Collectors;
 /// It does not read memory ranges, exception context, strings, module paths, or
 /// stack frames. Kernel dump formats remain header-only until WinDbg is used.
 /// </summary>
-public sealed class MiniDumpMetadataReader
+#if PCD_SHARE_READ_ONLY
+internal
+#else
+public
+#endif
+sealed class MiniDumpMetadataReader
 {
     private const int ThreadListStream = 3;
     private const int ModuleListStream = 4;
@@ -56,7 +61,7 @@ public sealed class MiniDumpMetadataReader
             cancellationToken.ThrowIfCancellationRequested();
             ThrowIfSensitiveOperationBlocked(isSensitiveOperationBlocked);
             fullPath = Path.GetFullPath(candidate.OriginalPath);
-            _ = DumpPackager.CaptureIdentity(fullPath, candidate.SizeBytes, candidate.LastWriteUtc);
+            _ = LocalFileIdentityCapture.Capture(fullPath, candidate.SizeBytes, candidate.LastWriteUtc);
             ThrowIfSensitiveOperationBlocked(isSensitiveOperationBlocked);
         }
         catch (UnauthorizedAccessException)

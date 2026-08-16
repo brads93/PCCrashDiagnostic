@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<artifact-configuration xmlns="http://signpath.io/artifact-configuration/v1">
+  <parameters>
+    <parameter name="product-version" required="true" />
+  </parameters>
+  <zip-file>
+    <pe-file path="PCCrashDiagnostic.exe"
+             product-name="PC Crash Diagnostic"
+             product-version="${product-version}"
+             file-version="3.2.0.0"
+             company-name="PC Crash Diagnostic contributors"
+             copyright="Copyright (c) 2026 PC Crash Diagnostic contributors"
+             original-filename="PCCrashDiagnostic.dll">
+      <authenticode-sign />
+    </pe-file>
+  </zip-file>
+</artifact-configuration>

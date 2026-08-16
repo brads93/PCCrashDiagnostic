@@ -1,0 +1,12 @@
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+  <System>
+    <Provider Name="iaStorAC" />
+    <EventID>129</EventID>
+    <Level>3</Level>
+    <TimeCreated SystemTime="2026-08-02T04:41:18.0000000Z" />
+    <Channel>System</Channel>
+  </System>
+  <RenderingInfo>
+    <Message>A reset was issued to the storage controller. Device details were removed from this fixture.</Message>
+  </RenderingInfo>
+</Event>

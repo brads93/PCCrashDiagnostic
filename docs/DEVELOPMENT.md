@@ -1,55 +1,142 @@
-# Development and release
+# Development
 
 ## Toolchain
 
-The repository pins .NET SDK `10.0.302` in `global.json`. Install that SDK (or a compatible patch permitted by the file) from Microsoft. The release targets `net10.0-windows10.0.19041.0` and `win-x64`.
+The repository pins .NET SDK `10.0.400` with roll-forward disabled in
+`global.json`. The ShareReadOnly release targets
+`net10.0-windows10.0.19041.0`, `win-x64`, and the serviced .NET runtime
+`10.0.11`.
 
-No Visual Studio installation is required for command-line builds. WPF compilation and integration testing require Windows.
+Release packaging also requires build-only Microsoft.NETCore.App runtime
+`8.0.30` to run Microsoft SBOM Tool 4.1.5. The builder verifies that exact
+runtime before generating SPDX 2.2 output; it is not included in the app.
+
+Command-line WPF builds require Windows. No Visual Studio installation is
+required.
+
+## Profiles
+
+The normal distributable graph is `PCCrashDiagnostic.Share.slnf` with:
+
+```text
+PCCrashDiagnosticVersion=3.2.0-beta.1
+PCCrashDiagnosticFeatureProfile=ShareReadOnly
+PCCrashDiagnosticWerLocalDumpCapture=Disabled
+PCCrashDiagnosticRuntimeVersion=10.0.11
+```
+
+Do not substitute the full solution when making a friend-facing artifact. The
+full solution contains non-distributable privileged and WER research projects.
+See [BUILD_PROFILES.md](BUILD_PROFILES.md).
 
 ## Restore, test, and run
 
 ```powershell
-dotnet restore .\PCCrashDiagnostic.sln --locked-mode
-dotnet test .\PCCrashDiagnostic.sln -c Release --no-restore
-dotnet run --project .\src\BF6CrashDiagnostic.App\BF6CrashDiagnostic.App.csproj -c Debug
+$properties = @(
+  '-p:PCCrashDiagnosticVersion=3.2.0-beta.1',
+  '-p:PCCrashDiagnosticFeatureProfile=ShareReadOnly',
+  '-p:PCCrashDiagnosticWerLocalDumpCapture=Disabled',
+  '-p:PCCrashDiagnosticRuntimeVersion=10.0.11'
+)
+
+dotnet restore .\PCCrashDiagnostic.Share.slnf --locked-mode @properties
+dotnet restore .\src\PCCrashDiagnostic.App\PCCrashDiagnostic.App.csproj -r win-x64 --locked-mode @properties
+dotnet test .\PCCrashDiagnostic.Share.slnf -c Release --no-restore @properties
+dotnet run --project .\src\PCCrashDiagnostic.App\PCCrashDiagnostic.App.csproj -c Debug @properties
 ```
 
-The lock files are authoritative. Use an unlocked restore only when intentionally updating a dependency, review the resulting lock-file diff, and update third-party notices if necessary.
+The lock files are authoritative. Use an unlocked restore only when
+intentionally updating dependencies. Review every lock-file diff, third-party
+notice impact, and the resulting SBOM before acceptance.
 
-## Release build
+Internal development uses `PCCrashDiagnostic.Full.slnf` with
+`PCCrashDiagnosticFeatureProfile=FullDiagnostic`. The compile-time project
+guards are intentional: the Share filter must fail under an internal profile,
+and the Full filter must fail under `ShareReadOnly`. Test both wrong-profile
+failures whenever profile/project guards change; a successful wrong-profile
+build is a release blocker.
+
+## Static release checks
 
 ```powershell
-.\tools\Build-Release.ps1 -Version 3.1.0-beta.1 -Configuration Release -RuntimeIdentifier win-x64
-.\tools\Build-Release.ps1 -Version 3.1.0-beta.2 -Configuration Release -RuntimeIdentifier win-x64
+.\tools\Test-SafetyBoundary.ps1 -ExpectedFeatureProfile ShareReadOnly
+.\tools\Test-ReleaseIdentity.ps1 -RequireRepositoryIdentity
 ```
 
-Useful parameters:
+The safety check validates compile/release gates and workflow pinning. It is not
+dynamic malware analysis or exact-package VM evidence.
 
-- `-OutputRoot <path>` changes the artifact destination.
-- `-Version 3.1.0-beta.1|3.1.0-beta.2` selects the compile-time feature stage and package identity. Beta.1 disables the beta.2 diagnostic additions. Both distributable stages compile new per-app WER apply off.
-- `-DotNetPath <path>` selects a specific `dotnet.exe`.
-- `-BuildTimestampUtc <ISO-8601 timestamp>` fixes archive timestamps for reproducibility checks.
-- `-RequireSignature -ExpectedSignerThumbprint <40-hex thumbprint>` requires a valid Authenticode signature from that certificate plus a timestamp certificate. Do not use this for the unsigned beta.
+## Build a candidate
 
-The script performs a static safety-boundary/dependency scan, locked restore, stage-specific test, single-file publish, staging, deterministic ZIP creation, manifest generation, checksum generation, helper-integrity verification, and packaged stage/version smoke check. Both packages must include the root `00-START-HERE.txt` recipient guide. The script refuses to overwrite an existing release directory. Run the scan alone with `tools\Test-SafetyBoundary.ps1`.
-
-## Verify artifacts
+Use a clean checkout. Place output outside the repository for release work:
 
 ```powershell
-.\tools\Verify-Release.ps1 -ArtifactsRoot .\artifacts\3.1.0-beta.1 -ExpectedVersion 3.1.0-beta.1
-.\tools\Verify-Release.ps1 -ArtifactsRoot .\artifacts\3.1.0-beta.2 -ExpectedVersion 3.1.0-beta.2
+.\tools\Build-Release.ps1 `
+  -OutputRoot C:\release-candidates `
+  -BuilderId 'local:developer'
 ```
 
-Pass `-RequireSignature -ExpectedSignerThumbprint <40-hex thumbprint>` for a signed-release check. Verification checks every listed asset hash, runtime ZIP shape, EXE architecture and signature status, manifest identity, and source ZIP exclusions.
+Use `-RequireExactTag` for a signing input. `-AllowDirtyControlledBuild` exists
+only for an unsigned local engineering candidate with modified tracked files;
+it rejects untracked files because they cannot be safely and completely bound
+to the source ZIP. It cannot be combined with a prebuilt signed executable.
 
-The verifier performs static checks by default and does not launch the packaged EXE. Add `-RunSmokeTest` only after establishing trust in the package; it launches the EXE with `--smoke-test` against a temporary data root and verifies the compiled tool version and feature stage.
+The builder:
 
-Do not exercise live registry writes, crash generation, or rollback on a development workstation during ordinary automated testing. Helper mutation and race tests use in-memory stores; the required live security matrix belongs in disposable Windows VMs.
+1. resolves the Git commit, tree, and clean/dirty state;
+2. checks SDK/profile/runtime and static boundaries;
+3. restores locked ShareReadOnly dependencies, including the exact `win-x64` App graph;
+4. runs tests, a fail-closed NuGet vulnerability audit, and a public
+   IL/resource/profile-boundary audit, then creates sanitized `TestEvidence.json`;
+5. publishes and smoke-tests one self-contained Windows x64 executable;
+6. generates and validates an SPDX 2.2 SBOM with Microsoft SBOM Tool 4.1.5 and writes unattested provenance;
+7. produces deterministic runtime/source ZIPs and schema-3 manifests; and
+8. statically verifies the candidate and runs the packaged smoke check.
 
-The machine-wide, basename-keyed WER LocalDumps implementation is retained only for security research. An explicit source test build can compile it with `-p:PCCrashDiagnosticWerLocalDumpCapture=Enabled`; never distribute that build or run its apply workflow outside a disposable VM. Normal builds and `Build-Release.ps1` force this property to `Disabled`, while receipt restore remains available.
+The builder refuses to overwrite an existing candidate directory. It never
+sets `ShareApproved=true`.
 
-## Signing a public release
+## Verify a candidate
 
-Obtain an organization-validated or extended-validation code-signing certificate from a CA trusted by Windows. Protect the private key in a hardware token or managed signing service; do not store it in the repository or a general CI secret. Sign the final EXE with SHA-256, include an RFC 3161 timestamp from the CA, verify the signature on a clean Windows machine, then package and hash the signed bytes.
+```powershell
+.\tools\Verify-Release.ps1 `
+  -ArtifactsRoot C:\release-candidates\3.2.0-beta.1-share-read-only-unsignedcandidate
+```
 
-Signing authenticates the publisher and protects integrity after signing. It does not guarantee SmartScreen reputation immediately, and it does not replace reproducible source, checksums, malware scanning, or security review.
+Verification checks manifest identity, package shape, every listed hash,
+source exclusions, PE architecture/version, Authenticode state, and packaged
+evidence. It extracts to a random temporary directory and does not launch the
+EXE unless `-RunSmokeTest` is supplied.
+
+`-RequireShareApproved` is the final verifier mode. It must fail for ordinary
+builder/SignPath candidates because exact-package VM approval is still external.
+
+## Reproducibility
+
+Set `SOURCE_DATE_EPOCH` or pass `-BuildTimestampUtc` and build the same clean
+commit twice into different output roots. Compare manifests and archive hashes.
+If they differ, do not label the build reproducible; inspect file ordering,
+timestamps, compiler inputs, and embedded data.
+
+Authenticode changes executable bytes. Preserve the unsigned input hash and
+signing-request identity, then bind all signed-candidate and VM evidence to the
+signed runtime ZIP hash.
+
+## CI and signing
+
+`.github/workflows/ci.yml` runs the locked ShareReadOnly graph on Windows and
+retains raw TRX evidence for seven days. Raw TRX can contain test/machine detail
+and is not packaged; `New-TestEvidence.ps1` emits only aggregate counts and the
+raw-file hash.
+
+The SignPath workflow is intentionally manual and disabled through repository
+configuration. Follow [CODE_SIGNING_POLICY.md](../CODE_SIGNING_POLICY.md) and
+[RELEASE_PROCESS.md](RELEASE_PROCESS.md). It produces a signed candidate only;
+no workflow publishes a release.
+
+## Testing boundaries
+
+Do not exercise live registry writes, deliberate crashes, Driver Verifier
+mutation, stress tests, repair commands, or privileged helper flows on a
+development workstation. The ShareReadOnly graph has no such APIs. Any future
+privileged security matrix belongs in fresh disposable Windows VMs.

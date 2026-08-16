@@ -2,50 +2,6 @@ using System.Text.Json.Serialization;
 
 namespace BF6CrashDiagnostic.Core.Models;
 
-public enum MiniDumpMetadataState
-{
-    RecognizedKernelDump,
-    ParsedUserModeMiniDump,
-    Unrecognized,
-    Unavailable,
-    Denied,
-    Invalid,
-    Failed
-}
-
-public sealed record MiniDumpMetadata(
-    MiniDumpMetadataState State,
-    DumpFormat Format,
-    string ProcessorArchitecture,
-    int? ProcessorCount,
-    int? WindowsMajorVersion,
-    int? WindowsMinorVersion,
-    int? WindowsBuildNumber,
-    uint? ProcessId,
-    DateTimeOffset? ProcessCreateTimeUtc,
-    int? ThreadCount,
-    int? ModuleCount,
-    IReadOnlyList<string> StreamsRead,
-    string Detail);
-
-public sealed record CdbInstallation(
-    string Path,
-    string Version,
-    string Source,
-    bool IsMicrosoftSigned,
-    bool IsX64,
-    string Signer);
-
-public sealed record WinDbgAnalysisRequest(
-    DumpCandidate Dump,
-    CdbInstallation Debugger,
-    SymbolAccessMode SymbolAccess,
-    string SymbolCachePath,
-    string RawLogDirectory,
-    bool MicrosoftSymbolDownloadConsent,
-    TimeSpan Timeout,
-    Func<bool> IsProtectedTargetRunning);
-
 public enum ProtectedEvidenceOperation
 {
     RetryNamedSource,

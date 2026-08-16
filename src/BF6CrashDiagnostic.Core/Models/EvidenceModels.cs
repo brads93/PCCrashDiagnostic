@@ -25,6 +25,29 @@ public enum IncidentSelectionMethod
     RecoveredSession
 }
 
+public enum IncidentEvidenceOrigin
+{
+    Unknown,
+    WindowsEventLog,
+    ReliabilityMonitor,
+    MonitorObservation,
+    ManualTime
+}
+
+public enum BootSessionBoundaryKind
+{
+    StartMarker,
+    CleanEndMarker,
+    UnexpectedEndMarker
+}
+
+public enum BootSessionReconstructionConfidence
+{
+    Unavailable,
+    Partial,
+    Corroborated
+}
+
 public enum BugcheckEvidenceSource
 {
     Unknown,
@@ -265,7 +288,8 @@ public sealed record IncidentCandidate(
     int EvidencePriority,
     int SupportingRecordCount,
     DateTimeOffset FirstSeenUtc,
-    DateTimeOffset LastSeenUtc);
+    DateTimeOffset LastSeenUtc,
+    IncidentEvidenceOrigin EvidenceOrigin = IncidentEvidenceOrigin.Unknown);
 
 public sealed record IncidentSelection(
     IncidentCandidate Candidate,
@@ -285,7 +309,25 @@ public sealed record BugcheckRecord(
     string? DumpFileName,
     string? RedactedDumpPath,
     [property: JsonIgnore]
-    string? OriginalDumpPath = null);
+    string? OriginalDumpPath = null,
+    string? BugcheckName = null);
+
+public sealed record BootSessionRecord(
+    DateTimeOffset TimeUtc,
+    string ProviderName,
+    int EventId,
+    BootSessionBoundaryKind BoundaryKind);
+
+public sealed record BootSessionContext(
+    DateTimeOffset IncidentTimeUtc,
+    DateTimeOffset? StartUtc,
+    DateTimeOffset? EndUtc,
+    bool? IncidentOccurredInSession,
+    string StartEvidence,
+    string EndEvidence,
+    BootSessionReconstructionConfidence Confidence,
+    IReadOnlyList<BootSessionRecord> Records,
+    string Limitation);
 
 public sealed record CrashReadiness(
     DateTimeOffset CapturedUtc,

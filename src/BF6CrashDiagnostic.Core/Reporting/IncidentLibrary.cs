@@ -6,6 +6,10 @@ using BF6CrashDiagnostic.Core.Models;
 
 namespace BF6CrashDiagnostic.Core.Reporting;
 
+public sealed record LocalReportCopy(
+    string ReportPath,
+    bool Imported);
+
 public sealed record IncidentLibraryEntry(
     string SessionId,
     int ReportSchemaVersion,
@@ -20,7 +24,8 @@ public sealed record IncidentLibraryEntry(
     IReadOnlyList<string> WheaCategories,
     string IncidentFingerprint,
     string ReportPath,
-    bool Imported);
+    bool Imported,
+    IReadOnlyList<LocalReportCopy>? LocalCopies = null);
 
 public sealed record RecurringIncidentGroup(
     string Category,
@@ -45,7 +50,8 @@ public sealed record ReportImportResult(
 public sealed record ValidatedReportArchive(
     int ReportSchemaVersion,
     string SessionId,
-    ReadOnlyMemory<byte> ReportJson);
+    ReadOnlyMemory<byte> ReportJson,
+    IReadOnlyList<string> Members);
 
 /// <summary>
 /// Builds history directly from report files. The index has no independent retention:
@@ -339,7 +345,7 @@ public sealed class IncidentLibrary
             await using FileStream stream = new(reportPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 64 * 1024, useAsync: true);
             using JsonDocument document = await JsonDocument.ParseAsync(stream, JsonOptions, cancellationToken).ConfigureAwait(false);
             IncidentLibraryEntry entry = ParseReport(document.RootElement, reportPath, imported);
-            incidents.TryAdd(entry.SessionId, entry);
+            MergeIncidentEntry(incidents, entry);
         }
         catch (Exception exception) when (exception is IOException or InvalidDataException or UnauthorizedAccessException or JsonException)
         {
@@ -361,11 +367,7 @@ public sealed class IncidentLibrary
             ValidatedReportArchive validated = await ValidateArchiveAsync(stream, cancellationToken).ConfigureAwait(false);
             using JsonDocument report = JsonDocument.Parse(validated.ReportJson, JsonOptions);
             IncidentLibraryEntry entry = ParseReport(report.RootElement, reportPath, imported);
-            if (!incidents.TryGetValue(entry.SessionId, out IncidentLibraryEntry? existing) ||
-                PreferArchiveEntry(entry, existing))
-            {
-                incidents[entry.SessionId] = entry;
-            }
+            MergeIncidentEntry(incidents, entry);
         }
         catch (Exception exception) when (exception is IOException or InvalidDataException or UnauthorizedAccessException or JsonException)
         {
@@ -388,6 +390,30 @@ public sealed class IncidentLibrary
         }
 
         return SafeLastWriteUtc(candidate.ReportPath) > SafeLastWriteUtc(existing.ReportPath);
+    }
+
+    private static void MergeIncidentEntry(
+        IDictionary<string, IncidentLibraryEntry> incidents,
+        IncidentLibraryEntry candidate)
+    {
+        if (!incidents.TryGetValue(candidate.SessionId, out IncidentLibraryEntry? existing))
+        {
+            incidents[candidate.SessionId] = candidate;
+            return;
+        }
+
+        IncidentLibraryEntry preferred = PreferArchiveEntry(candidate, existing) ? candidate : existing;
+        LocalReportCopy[] copies = (existing.LocalCopies ?? [])
+            .Concat(candidate.LocalCopies ?? [])
+            .DistinctBy(copy => Path.GetFullPath(copy.ReportPath), StringComparer.OrdinalIgnoreCase)
+            .OrderByDescending(copy => string.Equals(
+                Path.GetFullPath(copy.ReportPath),
+                Path.GetFullPath(preferred.ReportPath),
+                StringComparison.OrdinalIgnoreCase))
+            .ThenBy(copy => copy.Imported)
+            .ThenBy(copy => copy.ReportPath, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        incidents[candidate.SessionId] = preferred with { LocalCopies = copies };
     }
 
     private static DateTime SafeLastWriteUtc(string path)
@@ -514,7 +540,11 @@ public sealed class IncidentLibrary
             }
         }
 
-        return new ValidatedReportArchive(schemaVersion, sessionId, reportJson);
+        return new ValidatedReportArchive(
+            schemaVersion,
+            sessionId,
+            reportJson,
+            entries.Keys.Order(StringComparer.OrdinalIgnoreCase).ToArray());
     }
 
     private static bool IsSafeRootMemberName(string name)
@@ -697,6 +727,9 @@ public sealed class IncidentLibrary
         string fingerprint = ReadNestedString(root, "IncidentFingerprint", "Value")
             ?? CreateLibraryFingerprint(kind, targetName, stopCodes, failureBuckets, modules, wheaCategories);
 
+        LocalReportCopy[] localCopies = Path.GetExtension(reportPath).Equals(".zip", StringComparison.OrdinalIgnoreCase)
+            ? [new LocalReportCopy(Path.GetFullPath(reportPath), imported)]
+            : [];
         return new IncidentLibraryEntry(
             sessionId,
             schema,
@@ -711,7 +744,8 @@ public sealed class IncidentLibrary
             wheaCategories,
             fingerprint,
             reportPath,
-            imported);
+            imported,
+            localCopies);
     }
 
     private static IncidentKind ReadIncidentKind(JsonElement root)

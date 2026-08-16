@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
     <AssemblyName>PCCrashDiagnostic.Contracts</AssemblyName>
     <RootNamespace>PCCrashDiagnostic.Contracts</RootNamespace>
   </PropertyGroup>

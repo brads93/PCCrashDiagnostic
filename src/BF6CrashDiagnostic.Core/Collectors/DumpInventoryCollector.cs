@@ -4,7 +4,12 @@ using BF6CrashDiagnostic.Core.Reporting;
 
 namespace BF6CrashDiagnostic.Core.Collectors;
 
-public sealed class DumpInventoryCollector
+#if PCD_SHARE_READ_ONLY
+internal
+#else
+public
+#endif
+sealed class DumpInventoryCollector
 {
     private const int DefaultMaximumCandidatesPerSource = 256;
     private readonly SafeDumpInspector _inspector;

@@ -1,0 +1,159 @@
+name: SignPath ShareReadOnly candidate
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: signpath-share-read-only-v3.2.0-beta.1
+  cancel-in-progress: false
+
+jobs:
+  sign:
+    name: Build, sign, and repackage candidate
+    if: ${{ vars.SIGNPATH_ENABLED == 'true' }}
+    runs-on: windows-2025
+    timeout-minutes: 45
+    environment: code-signing
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+      DOTNET_NOLOGO: "1"
+    steps:
+      - name: Require the exact release tag
+        shell: pwsh
+        run: |
+          if ($env:GITHUB_REF -cne 'refs/tags/v3.2.0-beta.1') {
+            throw 'Signing is permitted only from refs/tags/v3.2.0-beta.1.'
+          }
+
+      - name: Check out tagged source
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: v3.2.0-beta.1
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install pinned .NET SDK
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          dotnet-version: |
+            8.0.424
+            10.0.400
+          cache: true
+          cache-dependency-path: |
+            .config/dotnet-tools.json
+            **/packages.lock.json
+
+      - name: Pin reproducible build timestamp to the tagged commit
+        shell: pwsh
+        run: |
+          $epoch = (git show -s --format=%ct HEAD).Trim()
+          if ($epoch -notmatch '^\d+$') { throw 'Could not derive SOURCE_DATE_EPOCH from the tagged commit.' }
+          Add-Content -LiteralPath $env:GITHUB_ENV -Value "SOURCE_DATE_EPOCH=$epoch"
+
+      - name: Build first isolated unsigned candidate
+        shell: pwsh
+        run: >-
+          ./tools/Build-Release.ps1
+          -OutputRoot "${{ runner.temp }}/pcd-unsigned-a"
+          -RequireExactTag
+          -BuilderId "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          -InvocationId "${{ github.run_id }}.${{ github.run_attempt }}.unsigned-a"
+
+      - name: Build second isolated unsigned candidate
+        shell: pwsh
+        run: >-
+          ./tools/Build-Release.ps1
+          -OutputRoot "${{ runner.temp }}/pcd-unsigned-b"
+          -RequireExactTag
+          -BuilderId "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          -InvocationId "${{ github.run_id }}.${{ github.run_attempt }}.unsigned-b"
+
+      - name: Require matching unsigned signing inputs and stage one executable
+        id: stage
+        shell: pwsh
+        run: |
+          $hashes = @()
+          $executables = @()
+          foreach ($label in @('a', 'b')) {
+            $runtimeZip = @(Get-ChildItem -LiteralPath "${{ runner.temp }}/pcd-unsigned-$label" -Filter 'PCCrashDiagnostic-3.2.0-beta.1-share-read-only-win-x64.zip' -File -Recurse)
+            if ($runtimeZip.Count -ne 1) { throw "Expected exactly one unsigned runtime ZIP for build $label." }
+            $extractRoot = "${{ runner.temp }}/pcd-unsigned-extracted-$label"
+            Expand-Archive -LiteralPath $runtimeZip[0].FullName -DestinationPath $extractRoot
+            $exe = @(Get-ChildItem -LiteralPath $extractRoot -Filter '*.exe' -File -Recurse)
+            if ($exe.Count -ne 1 -or $exe[0].Name -cne 'PCCrashDiagnostic.exe') {
+              throw "Signing input $label must contain only PCCrashDiagnostic.exe."
+            }
+            $executables += $exe[0]
+            $hashes += (Get-FileHash -LiteralPath $exe[0].FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          }
+          if ($hashes[0] -cne $hashes[1]) { throw 'Two isolated unsigned builds produced different signing-input hashes.' }
+          $inputRoot = '${{ runner.temp }}/pcd-signing-input'
+          New-Item -ItemType Directory -Path $inputRoot | Out-Null
+          $signingInput = Join-Path $inputRoot 'PCCrashDiagnostic.exe'
+          Copy-Item -LiteralPath $executables[0].FullName -Destination $signingInput
+          $expectedProductVersion = "3.2.0-beta.1+$((git rev-parse HEAD).Trim())"
+          $actualProductVersion = [Diagnostics.FileVersionInfo]::GetVersionInfo($signingInput).ProductVersion
+          if ($actualProductVersion -cne $expectedProductVersion) {
+            throw "Signing-input ProductVersion mismatch: expected '$expectedProductVersion', found '$actualProductVersion'."
+          }
+          Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value "sha256=$($hashes[0])"
+          Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value "product_version=$actualProductVersion"
+
+      - name: Upload isolated signing input
+        id: upload-signing-input
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: pcd-share-read-only-signing-input-${{ github.run_id }}
+          path: ${{ runner.temp }}/pcd-signing-input/PCCrashDiagnostic.exe
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Submit SignPath signing request
+        uses: SignPath/github-action-submit-signing-request@c92b958760219087e01f8d67a1669ed57afe2627 # v2.3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
+          artifact-configuration-slug: ${{ vars.SIGNPATH_ARTIFACT_CONFIGURATION_SLUG }}
+          github-artifact-id: ${{ steps.upload-signing-input.outputs.artifact-id }}
+          parameters: |
+            product-version: "${{ steps.stage.outputs.product_version }}"
+          output-artifact-directory: ${{ runner.temp }}/pcd-signed-output
+
+      - name: Validate and package signed candidate
+        shell: pwsh
+        env:
+          EXPECTED_SIGNER_THUMBPRINT: ${{ vars.SIGNPATH_SIGNER_THUMBPRINT }}
+          EXPECTED_SIGNER_SUBJECT: ${{ vars.SIGNPATH_SIGNER_SUBJECT }}
+          EXPECTED_SIGNER_ISSUER: ${{ vars.SIGNPATH_SIGNER_ISSUER }}
+          UNSIGNED_SIGNING_INPUT_SHA256: ${{ steps.stage.outputs.sha256 }}
+          SIGNING_INPUT_ARTIFACT_ID: ${{ steps.upload-signing-input.outputs.artifact-id }}
+        run: |
+          $signed = @(Get-ChildItem -LiteralPath '${{ runner.temp }}/pcd-signed-output' -Filter 'PCCrashDiagnostic.exe' -File -Recurse)
+          if ($signed.Count -ne 1) { throw 'SignPath output must contain exactly one PCCrashDiagnostic.exe.' }
+          ./tools/Build-Release.ps1 `
+            -OutputRoot '${{ runner.temp }}/pcd-signed-candidate' `
+            -PrebuiltExecutable $signed[0].FullName `
+            -ExpectedSignerThumbprint $env:EXPECTED_SIGNER_THUMBPRINT `
+            -ExpectedSignerSubject $env:EXPECTED_SIGNER_SUBJECT `
+            -ExpectedSignerIssuer $env:EXPECTED_SIGNER_ISSUER `
+            -UnsignedSigningInputSha256 $env:UNSIGNED_SIGNING_INPUT_SHA256 `
+            -ReproducibleBuildVerified $true `
+            -ReproducibilityPeerSha256 $env:UNSIGNED_SIGNING_INPUT_SHA256 `
+            -SigningInputArtifactId $env:SIGNING_INPUT_ARTIFACT_ID `
+            -RequireExactTag `
+            -BuilderId 'https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}' `
+            -InvocationId '${{ github.run_id }}.${{ github.run_attempt }}.signed'
+
+      - name: Upload signed candidate awaiting external gates
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: pcd-3.2.0-beta.1-signed-awaiting-vm-${{ github.run_id }}
+          path: ${{ runner.temp }}/pcd-signed-candidate/3.2.0-beta.1-share-read-only-signedawaitingexactpackagevmevidence/*
+          if-no-files-found: error
+          retention-days: 14

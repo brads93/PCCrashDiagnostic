@@ -11,6 +11,10 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\BF6CrashDiagnostic.Core\BF6CrashDiagnostic.Core.csproj" />
+    <ProjectReference Include="..\PCCrashDiagnostic.Privileged\PCCrashDiagnostic.Privileged.csproj" />
   </ItemGroup>
+  <Target Name="ValidateInternalHelperProfile" BeforeTargets="PrepareForBuild">
+    <Error Condition="'$(PCCrashDiagnosticFeatureProfile)' != 'FullDiagnostic' and '$(PCCrashDiagnosticFeatureProfile)' != 'WerResearch'"
+           Text="PCCrashDiagnostic.ElevatedHelper is internal-only and requires FullDiagnostic or WerResearch." />
+  </Target>
 </Project>

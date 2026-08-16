@@ -127,16 +127,16 @@
           "xunit.extensibility.core": "[2.9.3]"
         }
       },
-      "bf6crashdiagnostic.core": {
+      "pccrashdiagnostic.contracts": {
+        "type": "Project"
+      },
+      "pccrashdiagnostic.privileged": {
         "type": "Project",
         "dependencies": {
           "PCCrashDiagnostic.Contracts": "[3.2.0-beta.1, )",
           "System.Diagnostics.PerformanceCounter": "[10.0.11, )",
           "System.Management": "[10.0.11, )"
         }
-      },
-      "pccrashdiagnostic.contracts": {
-        "type": "Project"
       }
     }
   }

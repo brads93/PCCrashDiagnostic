@@ -726,6 +726,32 @@ public sealed class CrashCaptureConfigurationTests
         Assert.Equal(0, store.WerWriteCount);
     }
 
+    [WerLocalDumpCaptureTheory]
+    [InlineData("EAAntiCheat.GameService")]
+    [InlineData("EAAntiCheat.GameServiceLauncher")]
+    [InlineData("EAAntiCheatService")]
+    public async Task Helper_PermanentlyRejectsEveryProtectedRelatedExecutableAlias(string processName)
+    {
+        using var directory = new TestDirectory();
+        FakeConfigurationStore store = CreateInitialStore();
+        string werRoot = Path.Combine(directory.Path, "WerDumps");
+        TargetProfile forgedOrdinary = UnprotectedTarget() with
+        {
+            Id = "synthetic-protected-alias",
+            ProcessNames = [processName],
+            RelatedProcessNames = [],
+            BlockSensitiveOperationsWhileRunning = false
+        };
+        WerLocalDumpPlan plan = CreateWerPlan(store, werRoot, forgedOrdinary, processName + ".exe");
+        ProtectedEvidenceHelper helper = CreateConfigurationHelper(directory.Path, store, werRoot: werRoot);
+
+        ProtectedEvidenceResponse response = await helper.ExecuteAsync(
+            ConfigurationRequest(ProtectedEvidenceOperation.ApplyWerLocalDumpPlan, werPlan: plan));
+
+        Assert.False(response.Succeeded);
+        Assert.Equal(0, store.WerWriteCount);
+    }
+
     [WerLocalDumpCaptureFact]
     public async Task Helper_RejectsCriticalWindowsExecutableWerPlan()
     {

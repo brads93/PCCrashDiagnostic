@@ -1,0 +1,12 @@
+{
+  "solution": {
+    "path": "PCCrashDiagnostic.sln",
+    "projects": [
+      "src/PCCrashDiagnostic.Contracts/PCCrashDiagnostic.Contracts.csproj",
+      "src/PCCrashDiagnostic.Core/PCCrashDiagnostic.Core.csproj",
+      "src/PCCrashDiagnostic.LocalTools/PCCrashDiagnostic.LocalTools.csproj",
+      "src/PCCrashDiagnostic.App/PCCrashDiagnostic.App.csproj",
+      "tests/PCCrashDiagnostic.Share.Tests/PCCrashDiagnostic.Share.Tests.csproj"
+    ]
+  }
+}

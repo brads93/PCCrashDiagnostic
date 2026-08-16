@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
+    <AssemblyName>PCCrashDiagnostic.LocalTools</AssemblyName>
+    <RootNamespace>PCCrashDiagnostic.LocalTools</RootNamespace>
+    <Platforms>AnyCPU;x64</Platforms>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\PCCrashDiagnostic.Core\PCCrashDiagnostic.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\BF6CrashDiagnostic.Core\Analysis\CdbDiscovery.cs" Link="Analysis\CdbDiscovery.cs" />
+    <Compile Include="..\BF6CrashDiagnostic.Core\Analysis\WinDbgOutputParser.cs" Link="Analysis\WinDbgOutputParser.cs" />
+    <Compile Include="..\BF6CrashDiagnostic.Core\Analysis\WinDbgRunner.cs" Link="Analysis\WinDbgRunner.cs" />
+    <Compile Include="..\BF6CrashDiagnostic.Core\Collectors\DumpQualityCollector.cs" Link="Collectors\DumpQualityCollector.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="PCCrashDiagnostic.Share.Tests" />
+  </ItemGroup>
+  <Target Name="ValidateShareReadOnlyLocalToolsProfile" BeforeTargets="PrepareForBuild">
+    <Error Condition="'$(PCCrashDiagnosticFeatureProfile)' != 'ShareReadOnly'"
+           Text="PCCrashDiagnostic.LocalTools belongs only to the public ShareReadOnly graph." />
+  </Target>
+</Project>

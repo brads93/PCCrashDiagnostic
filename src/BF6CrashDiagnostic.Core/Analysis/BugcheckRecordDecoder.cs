@@ -48,7 +48,8 @@ public static class BugcheckRecordDecoder
             parameters,
             EvidencePathRedactor.FileName(dumpPath),
             EvidencePathRedactor.Redact(dumpPath),
-            dumpPath);
+            dumpPath,
+            code is null ? null : BugcheckCatalog.GetName(code.Value));
         return true;
     }
 

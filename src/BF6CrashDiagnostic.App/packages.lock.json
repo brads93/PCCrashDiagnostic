@@ -13,15 +13,15 @@
         "resolved": "10.0.11",
         "contentHash": "xyNn8KGbWI88LoUwg3rB8qcpFFST6dr8Ro/qS8GBu2GOwR0v7J82kVFHTiiPtvEKS79VbMTxs/sIKQ+Cq1Zs1g=="
       },
-      "bf6crashdiagnostic.core": {
+      "pccrashdiagnostic.contracts": {
+        "type": "Project"
+      },
+      "pccrashdiagnostic.privileged": {
         "type": "Project",
         "dependencies": {
           "PCCrashDiagnostic.Contracts": "[3.2.0-beta.1, )",
           "System.Management": "[10.0.11, )"
         }
-      },
-      "pccrashdiagnostic.contracts": {
-        "type": "Project"
       }
     },
     "net10.0-windows10.0.19041/win-x64": {

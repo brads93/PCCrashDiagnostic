@@ -1,0 +1,48 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
+    <AssemblyName>PCCrashDiagnostic.Core</AssemblyName>
+    <RootNamespace>PCCrashDiagnostic.Core</RootNamespace>
+    <Platforms>AnyCPU;x64</Platforms>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!-- This assembly is the public, standard-user boundary even when the
+         internal solution is compiled under a broader feature profile. -->
+    <DefineConstants>$(DefineConstants);PCD_SHARE_READ_ONLY</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="System.Diagnostics.PerformanceCounter" Version="10.0.11" />
+    <PackageReference Include="System.Management" Version="10.0.11" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\PCCrashDiagnostic.Contracts\PCCrashDiagnostic.Contracts.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\BF6CrashDiagnostic.Core\Models\DiagnosticModels.cs" Link="Models\DiagnosticModels.cs" />
+    <Compile Include="..\BF6CrashDiagnostic.Core\Models\EvidenceModels.cs" Link="Models\EvidenceModels.cs" />
+    <Compile Include="..\BF6CrashDiagnostic.Core\Models\ExtendedDiagnosticModels.cs" Link="Models\ExtendedDiagnosticModels.cs" />
+    <Compile Include="..\BF6CrashDiagnostic.Core\Models\ReportV3Models.cs" Link="Models\ReportV3Models.cs" />
+    <Compile Include="..\BF6CrashDiagnostic.Core\Models\LocalToolModels.cs" Link="Models\LocalToolModels.cs" Condition="Exists('..\BF6CrashDiagnostic.Core\Models\LocalToolModels.cs')" />
+    <Compile Include="..\BF6CrashDiagnostic.Core\Analysis\**\*.cs"
+             Exclude="..\BF6CrashDiagnostic.Core\Analysis\CdbDiscovery.cs;..\BF6CrashDiagnostic.Core\Analysis\WinDbgOutputParser.cs;..\BF6CrashDiagnostic.Core\Analysis\WinDbgRunner.cs"
+             Link="Analysis\%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="..\BF6CrashDiagnostic.Core\Collectors\**\*.cs"
+             Exclude="..\BF6CrashDiagnostic.Core\Collectors\CrashCaptureConfigurationStore.cs;..\BF6CrashDiagnostic.Core\Collectors\CrashReadinessCollector.cs;..\BF6CrashDiagnostic.Core\Collectors\DumpQualityCollector.cs;..\BF6CrashDiagnostic.Core\Collectors\ElevatedHelperClient.cs;..\BF6CrashDiagnostic.Core\Collectors\ElevatedHelperRequestStore.cs;..\BF6CrashDiagnostic.Core\Collectors\ProtectedEvidenceHelper.cs"
+             Link="Collectors\%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="..\BF6CrashDiagnostic.Core\Reporting\**\*.cs"
+             Exclude="..\BF6CrashDiagnostic.Core\Reporting\DumpPackager.cs"
+             Link="Reporting\%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="..\BF6CrashDiagnostic.Core\Sharing\**\*.cs"
+             Link="Sharing\%(RecursiveDir)%(Filename)%(Extension)"
+             Condition="Exists('..\BF6CrashDiagnostic.Core\Sharing')" />
+    <Compile Include="..\BF6CrashDiagnostic.Core\ReleaseStage.cs" Link="ReleaseStage.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="PCCrashDiagnostic.LocalTools" />
+    <InternalsVisibleTo Include="PCCrashDiagnostic.Share.Tests" />
+  </ItemGroup>
+  <Target Name="ValidateShareReadOnlyCoreProfile" BeforeTargets="PrepareForBuild">
+    <Error Condition="'$(PCCrashDiagnosticFeatureProfile)' != 'ShareReadOnly'"
+           Text="PCCrashDiagnostic.Core is the public ShareReadOnly core and cannot be compiled under an internal feature profile." />
+  </Target>
+</Project>
