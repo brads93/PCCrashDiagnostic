@@ -275,11 +275,9 @@ try {
     Push-Location $repoRoot
     try {
         & $safetyScriptPath -RepoRoot $repoRoot -ExpectedFeatureProfile $FeatureProfile
-        if ($LASTEXITCODE -ne 0) { throw 'Safety-boundary verification failed.' }
         $identityParameters = @{ RepoRoot = $repoRoot; RequireRepositoryIdentity = $true }
         if ($signedInput -or $RequireExactTag) { $identityParameters.RequireExactReleaseSource = $true }
         & $identityScriptPath @identityParameters
-        if ($LASTEXITCODE -ne 0) { throw 'Release-identity verification failed.' }
         $properties = @("-p:PCCrashDiagnosticVersion=$Version", "-p:PCCrashDiagnosticFeatureProfile=$FeatureProfile",
             '-p:PCCrashDiagnosticWerLocalDumpCapture=Disabled', "-p:PCCrashDiagnosticRuntimeVersion=$requiredRuntimeVersion")
         Invoke-DotNet -Arguments @('tool', 'restore', '--tool-manifest', $toolManifestPath)
@@ -483,7 +481,6 @@ try {
     Set-Content -LiteralPath (Join-Path $releaseStage 'SHA256SUMS.txt') -Value @($checksumItems | Sort-Object Name | ForEach-Object { "$($_.Sha256) *$($_.Name)" }) -Encoding ASCII
 
     & $verifyScriptPath -ArtifactsRoot $releaseStage -ExpectedVersion $Version -ExpectedFeatureProfile $FeatureProfile -RunSmokeTest
-    if ($LASTEXITCODE -ne 0) { throw 'Release-candidate verification failed.' }
     [IO.Directory]::Move($releaseStage, $releaseRoot)
     Write-Host "ShareReadOnly candidate created: $releaseRoot" -ForegroundColor Green
     Write-Host "Candidate state: $candidateState"

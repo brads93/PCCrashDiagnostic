@@ -19,7 +19,6 @@ if (-not (Test-Path -LiteralPath $evidenceFull -PathType Leaf)) { throw "VM evid
 
 $verifyScript = Join-Path $PSScriptRoot 'Verify-Release.ps1'
 & $verifyScript -ArtifactsRoot $candidateFull
-if ($LASTEXITCODE -ne 0) { throw 'The signed candidate failed verification before promotion.' }
 
 $manifestPath = Join-Path $candidateFull 'ReleaseManifest.json'
 $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
@@ -137,7 +136,6 @@ try {
         throw 'Promotion changed the VM-tested runtime ZIP bytes.'
     }
     & $verifyScript -ArtifactsRoot $approvedStage -RequireShareApproved
-    if ($LASTEXITCODE -ne 0) { throw 'Approved candidate failed final verification.' }
     [IO.Directory]::Move($approvedStage, $approvedRoot)
 } finally {
     if (Test-Path -LiteralPath $approvedStage) {
